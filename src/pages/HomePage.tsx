@@ -1,0 +1,173 @@
+import React, { useState } from 'react';
+import { useAuthStore } from '../stores/authStore';
+import { useTimesheetStore } from '../stores/timesheetStore.supabase';
+import { useClientStore } from '../stores/clientStore.supabase';
+import { useInvoiceStore } from '../stores/invoiceStore.supabase';
+import { useIsMobile } from '../hooks/useMediaQuery';
+import TimesheetsTab from '../components/TimesheetsTab';
+import ClientsTab from '../components/ClientsTab';
+import ReportsTab from '../components/ReportsTab';
+import ProfileTab from '../components/ProfileTab';
+
+export default function HomePage() {
+  const [activeTab, setActiveTab] = useState('timesheets');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const isMobile = useIsMobile();
+  const { user, logout } = useAuthStore();
+  const { hydrateTimesheets } = useTimesheetStore();
+  const { hydrateClients } = useClientStore();
+  const { hydrateInvoices } = useInvoiceStore();
+
+  const tabs = [
+    { id: 'timesheets', label: '📋 Feuilles de temps', icon: '📋' },
+    { id: 'clients', label: '👥 Clients', icon: '👥' },
+    { id: 'reports', label: '📊 Rapports', icon: '📊' },
+    { id: 'profile', label: '⚙️ Profil', icon: '⚙️' },
+  ];
+
+  const handleTabClick = (tabId: string) => {
+    setActiveTab(tabId);
+    setIsMobileMenuOpen(false);
+  };
+
+  const handleMenuToggle = () => {
+    setIsMobileMenuOpen(prev => !prev);
+  };
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'timesheets':
+        return <TimesheetsTab />;
+      case 'clients':
+        return <ClientsTab />;
+      case 'reports':
+        return <ReportsTab />;
+      case 'profile':
+        return <ProfileTab />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#fff' }}>
+      {/* Mobile hamburger button */}
+      {isMobile && (
+        <button
+          onClick={handleMenuToggle}
+          style={{
+            position: 'fixed',
+            top: '10px',
+            left: '10px',
+            zIndex: 10000,
+            minWidth: '56px',
+            minHeight: '56px',
+            padding: '16px',
+            backgroundColor: '#007AFF',
+            color: 'white',
+            border: 'none',
+            borderRadius: '12px',
+            cursor: 'pointer',
+            fontSize: '28px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            WebkitTapHighlightColor: 'transparent',
+            userSelect: 'none',
+          }}
+          type="button"
+          aria-label="Toggle menu"
+        >
+          ☰
+        </button>
+      )}
+
+      {/* Backdrop for mobile */}
+      {isMobile && isMobileMenuOpen && (
+        <div
+          onClick={handleMenuToggle}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            zIndex: 999,
+          }}
+        />
+      )}
+
+      {/* Sidebar */}
+      <div
+        style={{
+          width: '200px',
+          backgroundColor: '#f5f5f5',
+          borderRight: '1px solid #ddd',
+          padding: '20px',
+          display: 'flex',
+          flexDirection: 'column',
+          position: isMobile ? 'fixed' : 'relative',
+          left: isMobile ? (isMobileMenuOpen ? 0 : '-220px') : 0,
+          top: 0,
+          bottom: 0,
+          zIndex: 1000,
+          transition: 'left 0.3s ease',
+        }}
+      >
+        <h2 style={{ marginBottom: '30px', fontSize: '18px' }}>SAP Sheet</h2>
+        <nav style={{ flex: 1 }}>
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => handleTabClick(tab.id)}
+              style={{
+                width: '100%',
+                padding: '12px',
+                marginBottom: '8px',
+                backgroundColor: activeTab === tab.id ? '#007AFF' : 'transparent',
+                color: activeTab === tab.id ? 'white' : 'black',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                textAlign: 'left',
+                fontSize: '14px',
+                fontWeight: activeTab === tab.id ? 'bold' : 'normal',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+        <button
+          onClick={logout}
+          style={{
+            width: '100%',
+            padding: '12px',
+            backgroundColor: '#ff3b30',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: 'bold',
+          }}
+        >
+          Déconnexion
+        </button>
+      </div>
+
+      {/* Main Content */}
+      <div
+        style={{
+          flex: 1,
+          padding: isMobile ? '70px 20px 20px 20px' : '40px',
+          overflowY: 'auto',
+        }}
+      >
+        {renderContent()}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,30 @@
+{
+  "name": "SAP Sheet",
+  "short_name": "SAP",
+  "description": "Gestion des heures et facturation pour assistantes de vie",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#007AFF",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Timesheet",
+      "short_name": "Timesheet",
+      "description": "Ajouter une nouvelle feuille de temps",
+      "url": "/?tab=timesheets",
+      "icons": []
+    }
+  ]
+}

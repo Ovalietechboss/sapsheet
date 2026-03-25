@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "sap-sheet",
+    "slug": "sap-sheet",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#007AFF"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTabletMode": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#007AFF"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to access your location."
+        }
+      ]
+    ]
+  }
+}
