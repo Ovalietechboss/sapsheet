@@ -127,6 +127,18 @@ export default function AdminPage() {
     await loadData();
   };
 
+  const handleDeleteUser = async (u: DbUser) => {
+    const st = getStats(u.id);
+    const msg = st && (st.clientCount > 0 || st.timesheetCount > 0)
+      ? `${u.display_name} a ${st.clientCount} client(s) et ${st.timesheetCount} pointage(s).\nTOUTES ses données seront supprimées.\n\nConfirmer la suppression ?`
+      : `Supprimer le compte de ${u.display_name} (${u.email}) ?\n\nCette action est irréversible.`;
+    if (!window.confirm(msg)) return;
+
+    // Supprimer dans la table users (CASCADE supprime clients, timesheets, etc.)
+    await supabase.from('users').delete().eq('id', u.id);
+    await loadData();
+  };
+
   if (!user || user.role !== 'admin') {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: '16px' }}>
@@ -296,6 +308,12 @@ export default function AdminPage() {
                                 style={{ padding: '8px 14px', backgroundColor: u.role === 'admin' ? '#ff3b30' : '#34C759', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}
                               >
                                 {u.role === 'admin' ? 'Retirer admin' : 'Passer admin'}
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUser(u)}
+                                style={{ padding: '8px 14px', backgroundColor: '#ff3b30', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px' }}
+                              >
+                                Supprimer
                               </button>
                             </>
                           )}
