@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useClientStore, Client } from '../stores/clientStore.supabase';
+import { useClientStore, Client, ClientContact } from '../stores/clientStore.supabase';
 import { useMandataireStore, Mandataire } from '../stores/mandataireStore.supabase';
 
 const inputStyle: React.CSSProperties = {
@@ -20,7 +20,7 @@ const mandataireLabel = (m: Mandataire) =>
 // ═══════════════════════════════════════════════════════════════════════════
 
 export default function ClientsTab() {
-  const { clients, addClient, updateClient, deleteClient } = useClientStore();
+  const { clients, addClient, updateClient, deleteClient, contacts, getContactsForClient, addContact, deleteContact } = useClientStore();
   const { mandataires, addMandataire, updateMandataire, deleteMandataire } = useMandataireStore();
 
   const [subTab, setSubTab] = useState<'clients' | 'mandataires'>('clients');
@@ -33,10 +33,13 @@ export default function ClientsTab() {
   const [saving, setSaving] = useState(false);
 
   // ── Formulaire client ───────────────────────────────────────────────────
+  const [contactForm, setContactForm] = useState({ label: '', email: '', notes: '' });
+  const [showContactForm, setShowContactForm] = useState<string | null>(null); // client_id pour lequel on ajoute un contact
+
   const emptyClientForm = () => ({
     titre: '', first_name: '', name: '', email: '', address: '',
     facturation_mode: 'CESU' as 'CESU' | 'CLASSICAL',
-    hourly_rate: 15.5, mandataire_id: '',
+    hourly_rate: 15.5, mandataire_id: '', observations: '',
   });
   const [clientForm, setClientForm] = useState(emptyClientForm());
 
@@ -51,7 +54,7 @@ export default function ClientsTab() {
       titre: c.titre || '', first_name: c.first_name || '', name: c.name,
       email: c.email || '', address: c.address,
       facturation_mode: c.facturation_mode, hourly_rate: c.hourly_rate,
-      mandataire_id: c.mandataire_id || '',
+      mandataire_id: c.mandataire_id || '', observations: c.observations || '',
     });
     setEditingClient(c);
     setClientModal('edit');
@@ -70,6 +73,7 @@ export default function ClientsTab() {
         facturation_mode: clientForm.facturation_mode,
         hourly_rate: clientForm.hourly_rate,
         mandataire_id: clientForm.mandataire_id || undefined,
+        observations: clientForm.observations || undefined,
       };
       if (clientModal === 'edit' && editingClient) {
         await updateClient(editingClient.id, data);
@@ -309,6 +313,66 @@ export default function ClientsTab() {
               </button>
             </div>
           </div>
+          {/* Observations */}
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Observations / Instructions</label>
+            <textarea value={clientForm.observations} onChange={(e) => setClientForm({ ...clientForm, observations: e.target.value })}
+              rows={3} placeholder="Ex: Faire le pointage sur le site Nicole et Colette..."
+              style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }} />
+          </div>
+          {/* Contacts additionnels (visibles en mode édition) */}
+          {clientModal === 'edit' && editingClient && (
+            <div style={{ paddingTop: '12px', borderTop: '1px solid #eee' }}>
+              <label style={labelStyle}>Destinataires supplémentaires</label>
+              <p style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>
+                En plus du mandataire, qui doit recevoir les documents ?
+              </p>
+              {getContactsForClient(editingClient.id).map((ct) => (
+                <div key={ct.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', background: '#f9f9f9', padding: '8px 12px', borderRadius: '6px' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: '600', fontSize: '13px' }}>{ct.label}</div>
+                    <div style={{ fontSize: '12px', color: '#666' }}>{ct.email}{ct.notes ? ` — ${ct.notes}` : ''}</div>
+                  </div>
+                  <button type="button" onClick={() => deleteContact(ct.id)}
+                    style={{ padding: '4px 10px', backgroundColor: '#ff3b30', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>
+                    ×
+                  </button>
+                </div>
+              ))}
+              {showContactForm === editingClient.id ? (
+                <div style={{ background: '#f0f8ff', padding: '12px', borderRadius: '8px', marginTop: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                    <input type="text" value={contactForm.label} onChange={(e) => setContactForm({ ...contactForm, label: e.target.value })}
+                      placeholder="Nom du service *" style={{ ...inputStyle, fontSize: '13px' }} />
+                    <input type="email" value={contactForm.email} onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                      placeholder="Email *" style={{ ...inputStyle, fontSize: '13px' }} />
+                  </div>
+                  <input type="text" value={contactForm.notes} onChange={(e) => setContactForm({ ...contactForm, notes: e.target.value })}
+                    placeholder="Note (optionnel)" style={{ ...inputStyle, fontSize: '13px', marginBottom: '8px' }} />
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button type="button" onClick={() => setShowContactForm(null)}
+                      style={{ padding: '6px 12px', background: '#f5f5f5', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>
+                      Annuler
+                    </button>
+                    <button type="button" onClick={async () => {
+                      if (!contactForm.label || !contactForm.email) return;
+                      await addContact({ client_id: editingClient.id, label: contactForm.label, email: contactForm.email, notes: contactForm.notes || undefined });
+                      setContactForm({ label: '', email: '', notes: '' });
+                      setShowContactForm(null);
+                    }}
+                      style={{ padding: '6px 12px', background: '#007AFF', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
+                      Ajouter
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setShowContactForm(editingClient.id)}
+                  style={{ padding: '8px 14px', background: 'white', border: '1px dashed #007AFF', borderRadius: '6px', color: '#007AFF', cursor: 'pointer', fontSize: '13px', fontWeight: '600', width: '100%' }}>
+                  + Ajouter un destinataire
+                </button>
+              )}
+            </div>
+          )}
         </>,
         saving
       )}
@@ -382,6 +446,23 @@ export default function ClientsTab() {
                 <p style={{ fontSize: '12px', color: '#888', fontWeight: 'bold', marginBottom: '4px' }}>MANDATAIRE</p>
                 <p style={{ color: '#333', fontSize: '13px', marginBottom: '2px' }}>{fullName(mandataire.titre, mandataire.first_name, mandataire.name)}</p>
                 <p style={{ color: '#666', fontSize: '12px' }}>{mandataire.association_name} · {mandataire.email}</p>
+              </div>
+            )}
+            {getContactsForClient(client.id).length > 0 && (
+              <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #eee' }}>
+                <p style={{ fontSize: '12px', color: '#888', fontWeight: 'bold', marginBottom: '4px' }}>DESTINATAIRES</p>
+                {getContactsForClient(client.id).map((ct) => (
+                  <p key={ct.id} style={{ fontSize: '12px', color: '#666', marginBottom: '2px' }}>
+                    {ct.label} · {ct.email}
+                  </p>
+                ))}
+              </div>
+            )}
+            {client.observations && (
+              <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #eee' }}>
+                <p style={{ fontSize: '12px', color: '#FF9500', fontStyle: 'italic' }}>
+                  {client.observations}
+                </p>
               </div>
             )}
           </div>

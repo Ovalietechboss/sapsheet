@@ -13,12 +13,24 @@ export interface Client {
   facturation_mode: 'CESU' | 'CLASSICAL';
   hourly_rate: number;
   mandataire_id?: string;
+  observations?: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ClientContact {
+  id: string;
+  client_id: string;
+  label: string;
+  email: string;
+  notes?: string;
   created_at: number;
   updated_at: number;
 }
 
 interface ClientStore {
   clients: Client[];
+  contacts: ClientContact[];
   isLoading: boolean;
   hydrateClients: () => Promise<void>;
   addClient: (client: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>;
@@ -28,23 +40,29 @@ interface ClientStore {
   getClientsByFacturationMode: (mode: 'CESU' | 'CLASSICAL') => Client[];
   searchClients: (query: string) => Client[];
   setLoading: (loading: boolean) => void;
+  // Contacts additionnels
+  getContactsForClient: (clientId: string) => ClientContact[];
+  addContact: (contact: Omit<ClientContact, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  updateContact: (id: string, updates: Partial<ClientContact>) => Promise<void>;
+  deleteContact: (id: string) => Promise<void>;
 }
 
 export const useClientStore = create<ClientStore>((set, get) => ({
   clients: [],
+  contacts: [],
   isLoading: false,
 
   hydrateClients: async () => {
     set({ isLoading: true });
     try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const [{ data: clientsData, error: clientsError }, { data: contactsData }] = await Promise.all([
+        supabase.from('clients').select('*').order('created_at', { ascending: false }),
+        supabase.from('client_contacts').select('*').order('label', { ascending: true }),
+      ]);
 
-      if (error) throw error;
+      if (clientsError) throw clientsError;
 
-      set({ clients: data || [], isLoading: false });
+      set({ clients: clientsData || [], contacts: contactsData || [], isLoading: false });
     } catch (error) {
       console.error('hydrateClients failed', error);
       set({ isLoading: false });
@@ -126,5 +144,39 @@ export const useClientStore = create<ClientStore>((set, get) => ({
 
   setLoading: (loading) => {
     set({ isLoading: loading });
+  },
+
+  // ─── Contacts additionnels ───────────────────────────────────
+  getContactsForClient: (clientId) => {
+    return get().contacts.filter((c) => c.client_id === clientId);
+  },
+
+  addContact: async (contactData) => {
+    const now = Date.now();
+    const contact: ClientContact = {
+      ...contactData,
+      id: `contact_${now}`,
+      created_at: now,
+      updated_at: now,
+    };
+    const { error } = await supabase.from('client_contacts').insert(contact);
+    if (error) throw error;
+    set((state) => ({ contacts: [...state.contacts, contact] }));
+  },
+
+  updateContact: async (id, updates) => {
+    const now = Date.now();
+    const updated = { ...updates, updated_at: now };
+    const { error } = await supabase.from('client_contacts').update(updated).eq('id', id);
+    if (error) throw error;
+    set((state) => ({
+      contacts: state.contacts.map((c) => c.id === id ? { ...c, ...updated } : c),
+    }));
+  },
+
+  deleteContact: async (id) => {
+    const { error } = await supabase.from('client_contacts').delete().eq('id', id);
+    if (error) throw error;
+    set((state) => ({ contacts: state.contacts.filter((c) => c.id !== id) }));
   },
 }));
