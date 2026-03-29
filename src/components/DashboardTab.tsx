@@ -97,7 +97,7 @@ export default function DashboardTab({ onNavigate }: Props) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '24px' }}>
         <StatCard label="Heures" value={`${monthStats.totalHours.toFixed(1)}h`} bg="#EBF9F0" color="#2d8a4e" />
         <StatCard label="Clients actifs" value={String(monthStats.activeClients)} bg="#E8F4FF" color="#1a6fb5" />
-        <StatCard label="Pointages" value={String(monthStats.count)} bg="#FFF4E5" color="#b36b00" />
+        <StatCard label="Pointages" value={String(monthStats.count)} sub={`${monthStats.totalHours.toFixed(1)}h`} bg="#FFF4E5" color="#b36b00" />
         <StatCard label="À percevoir" value={`${monthStats.totalEarnings.toFixed(0)}€`} bg="#F0EBFF" color="#5b3db5" />
       </div>
 
@@ -208,11 +208,12 @@ export default function DashboardTab({ onNavigate }: Props) {
 
 // ── Sous-composants ─────────────────────────────────────────────────────────
 
-function StatCard({ label, value, bg, color }: { label: string; value: string; bg: string; color: string }) {
+function StatCard({ label, value, sub, bg, color }: { label: string; value: string; sub?: string; bg: string; color: string }) {
   return (
     <div style={{ background: bg, padding: '14px 12px', borderRadius: '10px', textAlign: 'center' }}>
       <div style={{ fontSize: '10px', textTransform: 'uppercase', color, letterSpacing: '0.5px', marginBottom: '4px', fontWeight: '600' }}>{label}</div>
       <div style={{ fontSize: '22px', fontWeight: 'bold', color }}>{value}</div>
+      {sub && <div style={{ fontSize: '12px', color, opacity: 0.7, marginTop: '2px' }}>{sub}</div>}
     </div>
   );
 }
