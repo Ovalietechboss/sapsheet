@@ -3,6 +3,8 @@ import { useAuthStore } from '../stores/authStore';
 
 type Mode = 'login' | 'signup';
 
+const ALLOW_SIGNUP = import.meta.env.VITE_ALLOW_SIGNUP === 'true';
+
 export default function LoginPage() {
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
@@ -100,38 +102,40 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Onglets */}
-        <div
-          style={{
-            display: 'flex',
-            backgroundColor: '#f0f2f5',
-            borderRadius: '10px',
-            padding: '4px',
-            marginBottom: '28px',
-          }}
-        >
-          {(['login', 'signup'] as Mode[]).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => switchMode(m)}
-              style={{
-                flex: 1,
-                padding: '9px',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                backgroundColor: mode === m ? 'white' : 'transparent',
-                color: mode === m ? '#007AFF' : '#888',
-                boxShadow: mode === m ? '0 1px 6px rgba(0,0,0,0.12)' : 'none',
-              }}
-            >
-              {m === 'login' ? 'Connexion' : 'Créer un compte'}
-            </button>
-          ))}
-        </div>
+        {/* Onglets — visibles seulement si les inscriptions sont ouvertes */}
+        {ALLOW_SIGNUP && (
+          <div
+            style={{
+              display: 'flex',
+              backgroundColor: '#f0f2f5',
+              borderRadius: '10px',
+              padding: '4px',
+              marginBottom: '28px',
+            }}
+          >
+            {(['login', 'signup'] as Mode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => switchMode(m)}
+                style={{
+                  flex: 1,
+                  padding: '9px',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  backgroundColor: mode === m ? 'white' : 'transparent',
+                  color: mode === m ? '#007AFF' : '#888',
+                  boxShadow: mode === m ? '0 1px 6px rgba(0,0,0,0.12)' : 'none',
+                }}
+              >
+                {m === 'login' ? 'Connexion' : 'Créer un compte'}
+              </button>
+            ))}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           {mode === 'signup' && (
@@ -254,24 +258,26 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '13px', color: '#888' }}>
-          {mode === 'login' ? 'Pas encore de compte ? ' : 'Déjà un compte ? '}
-          <button
-            type="button"
-            onClick={() => switchMode(mode === 'login' ? 'signup' : 'login')}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#007AFF',
-              fontWeight: '600',
-              cursor: 'pointer',
-              padding: 0,
-              fontSize: '13px',
-            }}
-          >
-            {mode === 'login' ? 'Créer un compte' : 'Se connecter'}
-          </button>
-        </p>
+        {ALLOW_SIGNUP && (
+          <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '13px', color: '#888' }}>
+            {mode === 'login' ? 'Pas encore de compte ? ' : 'Déjà un compte ? '}
+            <button
+              type="button"
+              onClick={() => switchMode(mode === 'login' ? 'signup' : 'login')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#007AFF',
+                fontWeight: '600',
+                cursor: 'pointer',
+                padding: 0,
+                fontSize: '13px',
+              }}
+            >
+              {mode === 'login' ? 'Créer un compte' : 'Se connecter'}
+            </button>
+          </p>
+        )}
       </div>
     </div>
   );
