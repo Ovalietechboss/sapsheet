@@ -6,6 +6,7 @@ import { useInvoiceStore } from './src/stores/invoiceStore.supabase';
 import { useMandataireStore } from './src/stores/mandataireStore.supabase';
 import LoginPage from './src/pages/LoginPage';
 import HomePage from './src/pages/HomePage';
+import ResetPasswordPage from './src/pages/ResetPasswordPage';
 
 export default function App() {
   const { isAuthenticated, isCheckingSession, checkSession, loadUser } = useAuthStore();
@@ -81,6 +82,11 @@ export default function App() {
         <p style={{ fontSize: '18px', color: '#333' }}>Chargement...</p>
       </div>
     );
+  }
+
+  // Page de reset password (lien depuis email Supabase)
+  if (window.location.pathname === '/reset-password') {
+    return <ResetPasswordPage />;
   }
 
   return isAuthenticated ? <HomePage /> : <LoginPage />;
