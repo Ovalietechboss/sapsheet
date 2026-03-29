@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS mandataires (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   titre TEXT,                        -- M., Mme., Dr., etc.
-  name TEXT NOT NULL,                -- Nom de la personne (ex: "Jean Martin")
+  name TEXT NOT NULL,                -- Nom de famille (ex: "Martin")
+  first_name TEXT,                   -- Prénom (ex: "Jean")
   association_name TEXT NOT NULL,    -- Nom de l'asso/entreprise (ex: "ADMR Paris")
   email TEXT NOT NULL,
   phone TEXT,
@@ -42,7 +43,9 @@ CREATE TABLE IF NOT EXISTS mandataires (
 CREATE TABLE IF NOT EXISTS clients (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
+  titre TEXT,                        -- M., Mme., etc.
+  name TEXT NOT NULL,                -- Nom de famille
+  first_name TEXT,                   -- Prénom
   email TEXT,
   address TEXT NOT NULL,
   facturation_mode TEXT NOT NULL CHECK (facturation_mode IN ('CESU', 'CLASSICAL')),

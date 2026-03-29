@@ -6,7 +6,8 @@ export interface Mandataire {
   id: string;
   user_id: string;
   titre?: string;              // M., Mme., Dr., etc.
-  name: string;                // Nom de la personne
+  name: string;                // Nom de famille
+  first_name?: string;         // Prénom
   association_name: string;    // Nom de l'association / entreprise
   email: string;
   phone?: string;

@@ -5,7 +5,9 @@ import { useAuthStore } from './authStore';
 export interface Client {
   id: string;
   user_id: string;
+  titre?: string;
   name: string;
+  first_name?: string;
   email?: string;
   address: string;
   facturation_mode: 'CESU' | 'CLASSICAL';
