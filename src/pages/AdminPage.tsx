@@ -27,6 +27,10 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<'dashboard' | 'users' | 'settings'>('dashboard');
   const [impersonating, setImpersonating] = useState<string | null>(null);
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [createForm, setCreateForm] = useState({ email: '', password: '', display_name: '', type: 'assistant' as 'assistant' | 'employer' });
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
 
   // Charger les données
   useEffect(() => {
@@ -76,6 +80,44 @@ export default function AdminPage() {
     } catch (err) {
       console.error(err);
       setImpersonating(null);
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCreating(true);
+    setCreateError('');
+    try {
+      // 1. Créer le compte auth Supabase
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: createForm.email,
+        password: createForm.password,
+      });
+      if (authError) throw new Error(authError.message);
+      if (!authData.user) throw new Error('Création du compte auth échouée');
+
+      // 2. Insérer dans la table users
+      const now = Date.now();
+      const { error: insertError } = await supabase.from('users').insert({
+        id: `user_${now}`,
+        auth_id: authData.user.id,
+        email: createForm.email,
+        display_name: createForm.display_name || createForm.email.split('@')[0],
+        type: createForm.type,
+        role: 'user',
+        created_at: now,
+        updated_at: now,
+      });
+      if (insertError) throw new Error(insertError.message);
+
+      // 3. Rafraîchir la liste
+      await loadData();
+      setShowCreateUser(false);
+      setCreateForm({ email: '', password: '', display_name: '', type: 'assistant' });
+    } catch (err: any) {
+      setCreateError(err.message || 'Erreur lors de la création');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -198,7 +240,15 @@ export default function AdminPage() {
             {/* ══════ UTILISATEURS ══════ */}
             {activeSection === 'users' && (
               <>
-                <h1 style={{ margin: '0 0 24px', fontSize: '24px', color: '#1a1a2e' }}>Gestion des utilisateurs</h1>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                  <h1 style={{ margin: 0, fontSize: '24px', color: '#1a1a2e' }}>Gestion des utilisateurs</h1>
+                  <button
+                    onClick={() => { setShowCreateUser(true); setCreateError(''); }}
+                    style={{ padding: '10px 20px', backgroundColor: '#007AFF', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' }}
+                  >
+                    + Créer un utilisateur
+                  </button>
+                </div>
                 <div style={{ display: 'grid', gap: '14px' }}>
                   {users.map((u) => {
                     const st = getStats(u.id);
@@ -227,23 +277,27 @@ export default function AdminPage() {
                             {u.email} · {st?.clientCount || 0} clients · {st?.timesheetCount || 0} pointages
                           </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          {!isMe && (
-                            <button
-                              onClick={() => handleImpersonate(u.id)}
-                              disabled={impersonating === u.id}
-                              style={{ padding: '8px 14px', backgroundColor: '#FF9500', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}
-                            >
-                              {impersonating === u.id ? 'Connexion...' : 'Se connecter en tant que'}
-                            </button>
-                          )}
-                          {!isMe && (
-                            <button
-                              onClick={() => handleToggleRole(u)}
-                              style={{ padding: '8px 14px', backgroundColor: u.role === 'admin' ? '#ff3b30' : '#34C759', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}
-                            >
-                              {u.role === 'admin' ? 'Retirer admin' : 'Passer admin'}
-                            </button>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          {isMe ? (
+                            <span style={{ padding: '6px 14px', backgroundColor: '#f0f0f0', borderRadius: '8px', fontSize: '13px', color: '#888', fontWeight: '600' }}>
+                              Vous
+                            </span>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleImpersonate(u.id)}
+                                disabled={impersonating === u.id}
+                                style={{ padding: '8px 14px', backgroundColor: '#FF9500', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}
+                              >
+                                {impersonating === u.id ? 'Connexion...' : 'Se connecter en tant que'}
+                              </button>
+                              <button
+                                onClick={() => handleToggleRole(u)}
+                                style={{ padding: '8px 14px', backgroundColor: u.role === 'admin' ? '#ff3b30' : '#34C759', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold' }}
+                              >
+                                {u.role === 'admin' ? 'Retirer admin' : 'Passer admin'}
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -286,6 +340,69 @@ export default function AdminPage() {
           </>
         )}
       </div>
+
+      {/* ══════ MODAL CRÉATION UTILISATEUR ══════ */}
+      {showCreateUser && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}
+          onClick={() => setShowCreateUser(false)}>
+          <div style={{ background: 'white', padding: '32px', borderRadius: '12px', width: '90%', maxWidth: '440px' }}
+            onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ marginBottom: '20px', fontSize: '20px' }}>Créer un utilisateur</h2>
+            <form onSubmit={handleCreateUser}>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold', fontSize: '13px' }}>Prénom et nom *</label>
+                <input type="text" value={createForm.display_name} onChange={(e) => setCreateForm({ ...createForm, display_name: e.target.value })} required placeholder="Cathy Martin"
+                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }} />
+              </div>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold', fontSize: '13px' }}>Email *</label>
+                <input type="email" value={createForm.email} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} required placeholder="cathy@email.fr"
+                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }} />
+              </div>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold', fontSize: '13px' }}>Mot de passe *</label>
+                <input type="text" value={createForm.password} onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })} required placeholder="minimum 6 caractères"
+                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }} />
+                <p style={{ color: '#888', fontSize: '11px', marginTop: '4px' }}>Visible ici pour que vous puissiez le communiquer à l'utilisateur</p>
+              </div>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold', fontSize: '13px' }}>Type de compte</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {(['assistant', 'employer'] as const).map((t) => (
+                    <button key={t} type="button" onClick={() => setCreateForm({ ...createForm, type: t })}
+                      style={{
+                        flex: 1, padding: '10px', border: `2px solid ${createForm.type === t ? '#007AFF' : '#ddd'}`,
+                        borderRadius: '8px', backgroundColor: createForm.type === t ? '#EBF4FF' : 'white',
+                        color: createForm.type === t ? '#007AFF' : '#555', fontWeight: '600', fontSize: '13px', cursor: 'pointer',
+                      }}>
+                      {t === 'assistant' ? 'Assistante' : 'Employeur'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {createError && (
+                <div style={{ background: '#FFF0F0', border: '1px solid #FFD0D0', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px', color: '#CC0000', fontSize: '13px' }}>
+                  {createError}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button type="button" onClick={() => setShowCreateUser(false)}
+                  style={{ flex: 1, padding: '12px', background: '#f5f5f5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                  Annuler
+                </button>
+                <button type="submit" disabled={creating}
+                  style={{ flex: 1, padding: '12px', background: creating ? '#ccc' : '#007AFF', color: 'white', border: 'none', borderRadius: '8px', cursor: creating ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>
+                  {creating ? 'Création...' : 'Créer'}
+                </button>
+              </div>
+              <p style={{ color: '#888', fontSize: '12px', marginTop: '12px', textAlign: 'center' }}>
+                L'utilisateur devra confirmer son email avant de pouvoir se connecter.
+                Vous pouvez confirmer manuellement dans Supabase → Authentication → Users.
+              </p>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
