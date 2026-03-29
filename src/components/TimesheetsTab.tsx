@@ -164,7 +164,19 @@ export default function TimesheetsTab() {
                 )}
                 {ts.notes && <p style={{ marginTop: '6px', fontStyle: 'italic', color: '#888', fontSize: '13px' }}>{ts.notes}</p>}
               </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {ts.status !== 'validated' && (
+                  <button onClick={() => updateTimesheet(ts.id, { status: 'validated' })}
+                    style={{ padding: '7px 14px', backgroundColor: '#34C759', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
+                    Valider
+                  </button>
+                )}
+                {ts.status === 'validated' && (
+                  <button onClick={() => updateTimesheet(ts.id, { status: 'draft' })}
+                    style={{ padding: '7px 14px', backgroundColor: '#FF9500', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>
+                    Repasser brouillon
+                  </button>
+                )}
                 <button onClick={() => openEdit(ts)}
                   style={{ padding: '7px 14px', backgroundColor: '#007AFF', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
                   Modifier
