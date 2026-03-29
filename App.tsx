@@ -8,6 +8,7 @@ import { useBillingPeriodStore } from './src/stores/billingPeriodStore.supabase'
 import LoginPage from './src/pages/LoginPage';
 import HomePage from './src/pages/HomePage';
 import ResetPasswordPage from './src/pages/ResetPasswordPage';
+import AdminPage from './src/pages/AdminPage';
 
 export default function App() {
   const { isAuthenticated, isCheckingSession, checkSession, loadUser } = useAuthStore();
@@ -90,6 +91,11 @@ export default function App() {
   // Page de reset password (lien depuis email Supabase)
   if (window.location.pathname === '/reset-password') {
     return <ResetPasswordPage />;
+  }
+
+  // Page admin (uniquement si connecté et admin)
+  if (window.location.pathname === '/admin' && isAuthenticated) {
+    return <AdminPage />;
   }
 
   return isAuthenticated ? <HomePage /> : <LoginPage />;

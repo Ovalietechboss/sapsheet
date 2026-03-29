@@ -15,7 +15,7 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isMobile = useIsMobile();
-  const { user, logout } = useAuthStore();
+  const { user, logout, isImpersonating, stopImpersonating } = useAuthStore();
   const { hydrateTimesheets } = useTimesheetStore();
   const { hydrateClients } = useClientStore();
   const { hydrateInvoices } = useInvoiceStore();
@@ -58,7 +58,24 @@ export default function HomePage() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#fff' }}>
+    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#fff', flexDirection: 'column' }}>
+      {/* Bannière impersonation */}
+      {isImpersonating && (
+        <div style={{
+          background: '#FF9500', color: 'white', padding: '8px 20px',
+          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '14px',
+          fontSize: '13px', fontWeight: '600', flexShrink: 0,
+        }}>
+          <span>Connecté en tant que {user?.display_name} ({user?.email})</span>
+          <button
+            onClick={() => { stopImpersonating(); window.location.href = '/admin'; }}
+            style={{ padding: '4px 14px', backgroundColor: 'white', color: '#FF9500', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}
+          >
+            Revenir admin
+          </button>
+        </div>
+      )}
+    <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
       {/* Mobile hamburger button */}
       {isMobile && (
         <button
@@ -176,6 +193,7 @@ export default function HomePage() {
       >
         {renderContent()}
       </div>
+    </div>
     </div>
   );
 }

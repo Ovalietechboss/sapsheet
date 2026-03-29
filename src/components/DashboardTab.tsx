@@ -177,6 +177,9 @@ export default function DashboardTab({ onNavigate }: Props) {
       {/* ── Footer ─────────────────────────────────────────────────────── */}
       <div style={{ textAlign: 'center', padding: '16px 0', fontSize: '12px', color: '#bbb' }}>
         SAP Sheet · Gestion de temps pour assistantes à domicile
+        {user?.role === 'admin' && (
+          <span> · <a href="/admin" style={{ color: '#bbb', textDecoration: 'none' }}>admin</a></span>
+        )}
       </div>
     </div>
   );

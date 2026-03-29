@@ -5,6 +5,7 @@ export interface User {
   id: string;
   auth_id: string;
   type: 'assistant' | 'employer';
+  role: 'user' | 'admin';
   email: string;
   display_name: string;
   created_at: number;
@@ -35,6 +36,11 @@ interface AuthState {
   updateUser: (data: Partial<User>) => Promise<void>;
   clearError: () => void;
   loadUser: () => Promise<void>;
+  // Admin: se connecter en tant qu'un autre utilisateur (sans mot de passe)
+  impersonate: (targetUserId: string) => Promise<void>;
+  stopImpersonating: () => void;
+  isImpersonating: boolean;
+  realAdmin: User | null;    // l'admin original stocké pendant l'impersonation
 }
 
 function mapDbUser(data: Record<string, unknown>): User {
@@ -44,6 +50,7 @@ function mapDbUser(data: Record<string, unknown>): User {
     email: data.email as string,
     display_name: (data.display_name as string) || '',
     type: data.type as 'assistant' | 'employer',
+    role: (data.role as 'user' | 'admin') || 'user',
     created_at: data.created_at as number,
     updated_at: data.updated_at as number,
     address: data.address as string | undefined,
@@ -64,6 +71,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: false,
   isCheckingSession: true,
   error: null,
+  isImpersonating: false,
+  realAdmin: null,
 
   // ─── Connexion ────────────────────────────────────────────
   login: async (email: string, password: string) => {
@@ -230,5 +239,35 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   clearError: () => {
     set({ error: null });
+  },
+
+  // ─── Impersonation (admin uniquement) ───────────────────────
+  impersonate: async (targetUserId: string) => {
+    const { user } = get();
+    if (!user || user.role !== 'admin') throw new Error('Non autorisé');
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', targetUserId)
+      .single();
+
+    if (error || !data) throw new Error('Utilisateur introuvable');
+
+    set({
+      realAdmin: user,
+      user: mapDbUser(data),
+      isImpersonating: true,
+    });
+  },
+
+  stopImpersonating: () => {
+    const { realAdmin } = get();
+    if (!realAdmin) return;
+    set({
+      user: realAdmin,
+      realAdmin: null,
+      isImpersonating: false,
+    });
   },
 }));
