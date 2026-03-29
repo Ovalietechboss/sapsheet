@@ -6,258 +6,181 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg)](https://www.typescriptlang.org/)
 [![Capacitor](https://img.shields.io/badge/Capacitor-8.0-blue.svg)](https://capacitorjs.com/)
 [![Supabase](https://img.shields.io/badge/Supabase-Backend-green.svg)](https://supabase.com/)
+[![Vercel](https://img.shields.io/badge/Vercel-Deployed-black.svg)](https://vercel.com/)
 
-## 🎉 Version 1.0 - Fonctionnalités
+## Fonctionnalites
 
-### ✅ Gestion complète
-- **Timesheets** : Suivi des heures avec arrivée/départ, frais annexes (repas, transport, autres)
-- **Clients** : Gestion clients avec modes CESU/CLASSICAL, mandataires optionnels
-- **Invoices** : Génération factures avec badges statut (BROUILLON/ENVOYÉE/PAYÉE)
-- **Reports** : Rapports mensuels avec breakdown par client, export CSV
-- **Profile** : Profil utilisateur complet (CESU, IBAN, BIC, SIREN/SIRET, adresses)
+### Gestion quotidienne
+- **Pointages** : Suivi des heures avec arrivee/depart, frais annexes (repas, transport, autres), date du jour par defaut
+- **Clients** : Gestion clients CESU/CLASSIQUE avec titre, prenom, nom, email, taux horaire
+- **Mandataires** : Table dediee (titre, prenom, nom, association/entreprise, email, SIREN, telephone)
+- **Factures** : Generation PDF reel (html2canvas + jsPDF), templates CESU et CLASSIQUE
+- **Rapports** : Rapports mensuels, export CSV (web + Android), statistiques par client
 
-### 📱 Multi-plateforme
-- **Web** : Application responsive desktop/tablet
-- **Android** : App native avec menu hamburger, partage de fichiers
-- **Export PDF** : 
-  - Web → Impression directe via `window.print()`
-  - Mobile → Partage HTML via Share API Android
+### Bilan de fin de mois
+- Groupement par mandataire avec email destinataire
+- Statuts par client : a generer / genere / envoye / erreur
+- Alertes avant cloture (pointages non valides, clients sans document)
+- Cloture du mois (verrouillage des timesheets)
+- Reouverture possible si correction necessaire
+- Archivage et historique des mois passes
 
-### 🎨 Templates de factures
-- **CESU** : Pointage CESU avec numéro prestataire
-- **Classical** : Facture classique avec SIREN/SIRET
+### Dashboard accueil
+- Salutation personnalisee avec stats du mois en cours
+- 4 cartes stats (heures, clients actifs, pointages, a percevoir)
+- Raccourcis rapides vers chaque section
+- Derniers pointages
 
-## 🚀 Démarrage rapide
+### Multi-plateforme
+- **Web** : Deploye sur Vercel (deploy automatique depuis GitHub)
+- **Android** : App native via Capacitor (APK)
+- **PDF** : Vrai PDF sur Android (html2canvas + jsPDF), impression sur web
 
-### Prérequis
+### Authentification
+- Login / Signup avec Supabase Auth
+- Confirmation email a l'inscription
+- Mot de passe oublie (email de reset)
+- Inscriptions publiques controlees par variable d'environnement
+
+### Administration
+- Page super-admin (`/admin`) reservee au role admin
+- Dashboard supervision : stats globales, activite par utilisateur
+- Gestion utilisateurs : toggle role, creation
+- Impersonation : se connecter en tant qu'un autre utilisateur (support sans mot de passe)
+- Banniere orange de retour admin pendant l'impersonation
+
+## Stack technique
+
+| Composant | Technologie |
+|---|---|
+| Frontend | React 18 + TypeScript 5.3 + Vite 7 |
+| State | Zustand (stores auth/timesheet/client/invoice/mandataire/billingPeriod) |
+| Backend | Supabase (PostgreSQL + Auth + REST API) |
+| Mobile | Capacitor 8 (Android SDK 36) |
+| PDF | html2canvas + jsPDF |
+| Deploy web | Vercel (auto-deploy depuis GitHub) |
+| Tests | Jest 29 (90 tests / 6 suites) |
+
+## Structure du projet
+
+```
+src/
+├── components/         # Onglets UI
+│   ├── DashboardTab    # Page d'accueil avec stats
+│   ├── TimesheetsTab   # Gestion des pointages
+│   ├── ClientsTab      # Sous-onglets Clients + Mandataires
+│   ├── BilansTab       # Bilan fin de mois + cloture
+│   ├── ReportsTab      # Rapports + export CSV/PDF
+│   └── ProfileTab      # Profil utilisateur
+├── stores/             # Zustand stores (Supabase)
+│   ├── authStore       # Auth + impersonation
+│   ├── clientStore     # CRUD clients
+│   ├── mandataireStore # CRUD mandataires
+│   ├── timesheetStore  # CRUD pointages
+│   ├── invoiceStore    # CRUD factures
+│   └── billingPeriodStore # Periodes + cloture
+├── services/           # InvoiceTemplates (CESU + CLASSIQUE), ReportService
+├── pages/              # LoginPage, HomePage, AdminPage, ResetPasswordPage
+├── utils/              # pdfGenerator (web + mobile)
+└── hooks/              # useIsMobile
+```
+
+## Base de donnees
+
+Schema dans `supabase-schema.sql` + migrations :
+
+| Table | Description |
+|---|---|
+| `users` | Utilisateurs (display_name, role, email, CESU, IBAN, SIREN...) |
+| `mandataires` | Mandataires (titre, prenom, nom, association, email, SIREN) |
+| `clients` | Clients (titre, prenom, nom, email, adresse, mode CESU/CLASSIQUE, mandataire_id) |
+| `timesheets` | Pointages (arrivee, depart, duree, frais) |
+| `invoices` | Factures (numero, statut, montant, mois/annee) |
+| `billing_periods` | Periodes de facturation (open/locked/archived) |
+| `billing_period_clients` | Suivi par client dans une periode (pending/generated/sent) |
+
+### Migrations SQL (a executer dans l'ordre)
+1. `supabase-schema.sql` — Schema initial
+2. `supabase-migration-mandataires.sql` — Table mandataires + mandataire_id sur clients
+3. `supabase-migration-names.sql` — Champs first_name + titre
+4. `supabase-migration-billing-periods.sql` — Periodes de facturation
+5. `supabase-migration-admin-role.sql` — Role admin
+
+## Demarrage rapide
+
+### Prerequis
 - Node.js 18+
-- Android Studio (pour build mobile)
 - Compte Supabase
+- Android Studio (optionnel, pour build mobile)
 
 ### Installation
 
 ```bash
-# Cloner le repo
 git clone https://github.com/Ovalietechboss/sapsheet.git
-cd sapsheet
-
-# Installer les dépendances
+cd sapsheet/sapsheet-main
 npm install --legacy-peer-deps
-
-# Créer .env avec vos clés Supabase
 cp .env.example .env
-# Éditer .env avec VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY
-
-# Lancer en mode web
+# Editer .env avec vos cles Supabase
 npm run dev
-
-# Build pour production web
-npm run build
-npm run preview -- --host 0.0.0.0 --port 4173
 ```
 
-### Android Build
+### Variables d'environnement
 
-```bash
-# Build Vite + sync Capacitor
-npm run build
-npm run cap:sync
-
-# Ouvrir dans Android Studio
-npm run cap:open:android
-
-# Puis Run 'app' dans Android Studio
-```
-
-## 📊 Architecture technique
-
-### Stack
-- **Frontend** : React 18 + TypeScript + Vite 7
-- **State** : Zustand (stores auth/timesheet/client/invoice/ui/sync)
-- **Backend** : Supabase (PostgreSQL + REST API)
-- **Mobile** : Capacitor 8 (Android SDK 36, Gradle 8.11.1)
-- **PDF** : html2canvas + jspdf + Templates HTML
-
-### Structure
-```
-src/
-├── components/         # UI tabs (Timesheets, Clients, Invoices, Reports, Profile)
-├── stores/            # Zustand stores avec mapping snake_case ↔ camelCase
-├── services/          # InvoiceTemplates, DatabaseService
-├── utils/             # pdfGenerator (web + mobile)
-├── hooks/             # useIsMobile, useMediaQuery
-├── pages/             # LoginPage, HomePage
-└── config/            # constants.ts
-
-android/
-├── app/
-│   ├── build.gradle   # Gradle 8.11.1, SDK 36
-│   └── src/main/
-│       ├── AndroidManifest.xml  # Permissions FileProvider
-│       └── res/
-```
-
-### Base de données Supabase
-
-Schema défini dans `supabase-schema.sql` :
-- `users` : display_name, email, address, phone, cesu_number, iban, bic, siren, siret, business_name, business_address
-- `clients` : name, address, facturation_mode (CESU/CLASSICAL), hourly_rate, mandataire (optionnel)
-- `timesheets` : date_arrival, date_departure, duration, frais_repas/transport/autres, notes
-- `invoices` : invoice_number, status (draft/sent/paid), total_amount, month, year, facturation_mode
-- `invoice_templates` : Modèles personnalisables (future feature)
-
-## 🔧 Configuration
-
-### Variables d'environnement (.env)
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_ALLOW_SIGNUP=false   # true pour ouvrir les inscriptions
 ```
 
-### Capacitor (capacitor.config.ts)
-```typescript
-{
-  appId: 'com.sapsheet.app',
-  appName: 'SAP Sheet',
-  webDir: 'dist',
-  server: { androidScheme: 'https', allowNavigation: ['*'] },
-  android: { allowMixedContent: true, captureInput: true }
-}
-```
+### Build production
 
-## 📱 Features mobiles
-
-### Menu hamburger
-- Bouton ☰ en haut à gauche (56×56px, z-index 10000)
-- Backdrop transparent pour fermer
-- Transition CSS smooth (300ms)
-
-### Export PDF Android
-- Génération HTML depuis templates CESU/CLASSICAL
-- Encodage base64 UTF-8 pour caractères français
-- Partage via Share API native → Ouvrir dans Chrome → Imprimer en PDF
-- Cache Android (`Directory.Cache`) pour fichiers temporaires
-
-### Permissions Android (AndroidManifest.xml)
-```xml
-<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-<provider android:name="androidx.core.content.FileProvider" ... />
-```
-
-## 🎯 Mapping snake_case ↔ camelCase
-
-### Frontend (TypeScript camelCase)
-```typescript
-interface User {
-  displayName: string;
-  cesuNumber?: string;
-  // ...
-}
-```
-
-### Backend (Supabase snake_case)
-```sql
-CREATE TABLE users (
-  display_name TEXT,
-  cesu_number TEXT,
-  ...
-);
-```
-
-### Conversion dans authStore.ts
-```typescript
-updateUser: (data) => {
-  const { createdAt, updatedAt, ...allowedData } = data;
-  await supabase.from('users').update(allowedData).eq('id', user.id);
-  await loadUser(); // Recharge avec mapping
-},
-
-loadUser: () => {
-  const mappedUser = {
-    displayName: data.display_name,
-    cesuNumber: data.cesu_number,
-    // ...
-  };
-}
-```
-
-## 📄 Templates de factures
-
-### Template CESU (vert #34C759)
-- Badge "POINTAGE CESU" + numéro CESU
-- Tableau heures avec taux horaire
-- Section frais annexes si présents
-- Mentions TVA non applicable, IBAN/BIC
-
-### Template CLASSICAL (bleu #007AFF)
-- Badge "FACTURE CLASSIQUE" + SIREN/SIRET
-- Info entreprise (business_name, business_address)
-- Mandataire si configuré
-- Layout identique aux factures professionnelles
-
-## 🐛 Debugging
-
-### Logs Android (Logcat)
 ```bash
-# Dans Android Studio → Logcat (onglet bas)
-# Filtrer par "capacitor" ou "sapsheet"
+npm run build          # Build web
+npx cap sync android   # Sync Android
+npx cap open android   # Ouvrir dans Android Studio
 ```
 
-### Console web (F12)
-```javascript
-// Tous les stores Zustand exposent leurs données
-console.log(useAuthStore.getState().user);
-console.log(useTimesheetStore.getState().timesheets);
+### Tests
+
+```bash
+npx jest               # 90 tests / 6 suites
 ```
 
-## 🔒 Sécurité
+## Deploiement
 
-- `.env` **non commité** (dans `.gitignore`)
-- `.env.example` fourni pour documentation
-- RLS Supabase désactivé pour démo (à activer en prod avec auth Supabase)
-- Clés Supabase ANON (publiques) seulement
+### Web (Vercel)
+- Connecte a GitHub (Ovalietechboss/sapsheet)
+- Root Directory : `sapsheet-main`
+- Auto-deploy a chaque push sur `main`
+- Variables d'env configurees dans Vercel Settings
 
-## 🚧 Roadmap v2.0
+### Android
+- Build APK depuis Android Studio : Build > Build APK(s)
+- Ou en ligne de commande : `cd android && gradlew assembleDebug`
 
-- [ ] Synchronisation offline complète (Service Worker)
-- [ ] Envoi email automatique factures (Supabase Edge Functions)
-- [ ] Export PDF natif mobile (plugin react-native-html-to-pdf)
-- [ ] Multi-utilisateurs avec auth Supabase (RLS activé)
-- [ ] Signature électronique factures
-- [ ] Dashboard analytics avancé
-- [ ] Tests E2E Playwright
+## Securite
 
-## 📝 Notes de développement
+- `.env` non commite (`.gitignore`)
+- Cle Supabase ANON uniquement (publique par design)
+- Inscriptions publiques desactivees par defaut
+- Confirmation email obligatoire a l'inscription
+- Page admin protegee par role
+- RLS Supabase pret a activer
 
-### Session du 26 janvier 2026
-- ✅ Configuration Gradle 8.11.1 + Android SDK 36
-- ✅ Menu hamburger responsive mobile
-- ✅ Profil utilisateur avec mapping snake_case/camelCase
-- ✅ Export PDF web + mobile (Share API)
-- ✅ Templates CESU/CLASSICAL complets
-- ✅ Badges statut factures (BROUILLON/ENVOYÉE/PAYÉE)
-- ✅ Reports avec breakdown par client + export CSV
-- ✅ Hook useIsMobile pour détecter taille écran
-- ✅ Permissions Android FileProvider
-- ✅ Push GitHub complet avec .gitignore
+## Roadmap
 
-### Problèmes résolus
-1. **window.open() bloqué sur Android** → Share API + Filesystem
-2. **Caractères UTF-8 corrompus** → Encodage base64 avec `btoa(unescape(encodeURIComponent()))`
-3. **Colonnes Supabase manquantes** → ALTER TABLE dans SQL Editor
-4. **Mapping snake_case/camelCase** → Conversion dans authStore loadUser/updateUser
-5. **Gradle deprecated** → Mise à jour vers 8.11.1 + SDK 36
-6. **Menu mobile caché** → z-index 10000 + minWidth/minHeight fixes
+- [ ] Envoi email automatique (Resend + Supabase Edge Functions)
+- [ ] Synchronisation offline (Service Worker)
+- [ ] Publication Play Store
+- [ ] Nom de domaine custom
+- [ ] Portail mandataire (validation des pointages)
+- [ ] Dashboard analytics avance
+- [ ] Activation RLS Supabase
 
-## 📞 Support
+## Licence
 
-Pour toute question : [GitHub Issues](https://github.com/Ovalietechboss/sapsheet/issues)
-
-## 📄 Licence
-
-Propriétaire - © 2026 SAP Sheet
+Proprietaire - (c) 2026 SAP Sheet
 
 ---
 
-**Développé avec ❤️ pour les assistantes de vie à domicile**
+Developpe pour les assistantes de vie a domicile
