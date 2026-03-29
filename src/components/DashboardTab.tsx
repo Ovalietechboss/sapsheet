@@ -174,9 +174,30 @@ export default function DashboardTab({ onNavigate }: Props) {
         )}
       </div>
 
+      {/* ── Besoin d'aide ──────────────────────────────────────────────── */}
+      <div style={{ background: 'white', border: '1px solid #eee', borderRadius: '12px', padding: '20px', marginBottom: '20px', textAlign: 'center' }}>
+        <p style={{ fontWeight: '600', fontSize: '15px', color: '#333', marginBottom: '12px' }}>Besoin d'aide ?</p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <a
+            href="https://wa.me/33676672672?text=Bonjour%2C%20j'ai%20une%20question%20sur%20SAP%20Sheet"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', backgroundColor: '#25D366', color: 'white', borderRadius: '10px', textDecoration: 'none', fontWeight: 'bold', fontSize: '14px' }}
+          >
+            WhatsApp
+          </a>
+          <a
+            href="mailto:poumpoum6565@gmail.com?subject=SAP%20Sheet%20-%20Aide&body=Bonjour%2C%0A%0AJ'ai%20besoin%20d'aide%20avec%20SAP%20Sheet%20%3A%0A%0A"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', backgroundColor: '#007AFF', color: 'white', borderRadius: '10px', textDecoration: 'none', fontWeight: 'bold', fontSize: '14px' }}
+          >
+            Email
+          </a>
+        </div>
+      </div>
+
       {/* ── Footer ─────────────────────────────────────────────────────── */}
       <div style={{ textAlign: 'center', padding: '16px 0', fontSize: '12px', color: '#bbb' }}>
-        SAP Sheet · Gestion de temps pour assistantes à domicile
+        SAP Sheet · Gestion de temps pour assistantes a domicile
         {user?.role === 'admin' && (
           <span> · <a href="/admin" style={{ color: '#bbb', textDecoration: 'none' }}>admin</a></span>
         )}
