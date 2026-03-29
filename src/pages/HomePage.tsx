@@ -4,6 +4,7 @@ import { useTimesheetStore } from '../stores/timesheetStore.supabase';
 import { useClientStore } from '../stores/clientStore.supabase';
 import { useInvoiceStore } from '../stores/invoiceStore.supabase';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import DashboardTab from '../components/DashboardTab';
 import TimesheetsTab from '../components/TimesheetsTab';
 import ClientsTab from '../components/ClientsTab';
 import ReportsTab from '../components/ReportsTab';
@@ -11,7 +12,7 @@ import BilansTab from '../components/BilansTab';
 import ProfileTab from '../components/ProfileTab';
 
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState('timesheets');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isMobile = useIsMobile();
   const { user, logout } = useAuthStore();
@@ -20,7 +21,8 @@ export default function HomePage() {
   const { hydrateInvoices } = useInvoiceStore();
 
   const tabs = [
-    { id: 'timesheets', label: '📋 Feuilles de temps', icon: '📋' },
+    { id: 'dashboard', label: '🏠 Accueil', icon: '🏠' },
+    { id: 'timesheets', label: '📋 Pointages', icon: '📋' },
     { id: 'clients', label: '👥 Clients', icon: '👥' },
     { id: 'bilans', label: '📅 Bilans', icon: '📅' },
     { id: 'reports', label: '📊 Rapports', icon: '📊' },
@@ -38,6 +40,8 @@ export default function HomePage() {
 
   const renderContent = () => {
     switch (activeTab) {
+      case 'dashboard':
+        return <DashboardTab onNavigate={handleTabClick} />;
       case 'timesheets':
         return <TimesheetsTab />;
       case 'clients':
