@@ -7,6 +7,7 @@ import { useIsMobile } from '../hooks/useMediaQuery';
 import TimesheetsTab from '../components/TimesheetsTab';
 import ClientsTab from '../components/ClientsTab';
 import ReportsTab from '../components/ReportsTab';
+import BilansTab from '../components/BilansTab';
 import ProfileTab from '../components/ProfileTab';
 
 export default function HomePage() {
@@ -21,6 +22,7 @@ export default function HomePage() {
   const tabs = [
     { id: 'timesheets', label: '📋 Feuilles de temps', icon: '📋' },
     { id: 'clients', label: '👥 Clients', icon: '👥' },
+    { id: 'bilans', label: '📅 Bilans', icon: '📅' },
     { id: 'reports', label: '📊 Rapports', icon: '📊' },
     { id: 'profile', label: '⚙️ Profil', icon: '⚙️' },
   ];
@@ -40,6 +42,8 @@ export default function HomePage() {
         return <TimesheetsTab />;
       case 'clients':
         return <ClientsTab />;
+      case 'bilans':
+        return <BilansTab />;
       case 'reports':
         return <ReportsTab />;
       case 'profile':

@@ -6,12 +6,11 @@ export interface Client {
   id: string;
   user_id: string;
   name: string;
+  email?: string;
   address: string;
   facturation_mode: 'CESU' | 'CLASSICAL';
   hourly_rate: number;
-  mandataire_name?: string;
-  mandataire_email?: string;
-  mandataire_siren?: string;
+  mandataire_id?: string;
   created_at: number;
   updated_at: number;
 }

@@ -23,17 +23,31 @@ CREATE TABLE IF NOT EXISTS users (
   bic TEXT
 );
 
+-- Mandataires table
+CREATE TABLE IF NOT EXISTS mandataires (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  titre TEXT,                        -- M., Mme., Dr., etc.
+  name TEXT NOT NULL,                -- Nom de la personne (ex: "Jean Martin")
+  association_name TEXT NOT NULL,    -- Nom de l'asso/entreprise (ex: "ADMR Paris")
+  email TEXT NOT NULL,
+  phone TEXT,
+  siren TEXT,
+  address TEXT,
+  created_at BIGINT NOT NULL,
+  updated_at BIGINT NOT NULL
+);
+
 -- Clients table
 CREATE TABLE IF NOT EXISTS clients (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  email TEXT,
   address TEXT NOT NULL,
   facturation_mode TEXT NOT NULL CHECK (facturation_mode IN ('CESU', 'CLASSICAL')),
   hourly_rate DECIMAL(10,2) NOT NULL,
-  mandataire_name TEXT,
-  mandataire_email TEXT,
-  mandataire_siren TEXT,
+  mandataire_id TEXT REFERENCES mandataires(id) ON DELETE SET NULL,
   created_at BIGINT NOT NULL,
   updated_at BIGINT NOT NULL
 );
@@ -83,21 +97,24 @@ CREATE TABLE IF NOT EXISTS invoice_templates (
 
 -- Row Level Security (RLS) Policies
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mandataires ENABLE ROW LEVEL SECURITY;
 ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE timesheets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invoice_templates ENABLE ROW LEVEL SECURITY;
 
 -- Disable RLS for now (can be enabled later with proper auth setup)
--- Users can insert/select/update without auth
 ALTER TABLE users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE mandataires DISABLE ROW LEVEL SECURITY;
 ALTER TABLE clients DISABLE ROW LEVEL SECURITY;
 ALTER TABLE timesheets DISABLE ROW LEVEL SECURITY;
 ALTER TABLE invoices DISABLE ROW LEVEL SECURITY;
 ALTER TABLE invoice_templates DISABLE ROW LEVEL SECURITY;
 
 -- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_mandataires_user_id ON mandataires(user_id);
 CREATE INDEX IF NOT EXISTS idx_clients_user_id ON clients(user_id);
+CREATE INDEX IF NOT EXISTS idx_clients_mandataire_id ON clients(mandataire_id);
 CREATE INDEX IF NOT EXISTS idx_timesheets_user_id ON timesheets(user_id);
 CREATE INDEX IF NOT EXISTS idx_timesheets_client_id ON timesheets(client_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_user_id ON invoices(user_id);

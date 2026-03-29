@@ -19,8 +19,17 @@ export default function TimesheetsTab() {
   const { clients } = useClientStore();
   const [showModal, setShowModal] = useState(false);
   const [selectedTimesheet, setSelectedTimesheet] = useState<Timesheet | null>(null);
+  const todayStr = () => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
   const [formData, setFormData] = useState({
     clientId: clients[0]?.id || '',
+    date: todayStr(),
     dateArrival: '',
     timeDeparture: '',
   });
@@ -31,9 +40,9 @@ export default function TimesheetsTab() {
       return;
     }
 
-    // Calculate duration
-    const arrivalTime = new Date(`2024-01-01 ${formData.dateArrival}`);
-    const departureTime = new Date(`2024-01-01 ${formData.timeDeparture}`);
+    // Calculate duration (même jour pour les deux)
+    const arrivalTime = new Date(`${formData.date}T${formData.dateArrival}:00`);
+    const departureTime = new Date(`${formData.date}T${formData.timeDeparture}:00`);
     const durationMinutes = Math.round(
       (departureTime.getTime() - arrivalTime.getTime()) / (1000 * 60)
     );
@@ -47,8 +56,8 @@ export default function TimesheetsTab() {
       id: `ts_${uuid()}`,
       assistantId: 'user_123', // Placeholder
       clientId: formData.clientId,
-      dateArrival: `2024-01-25 ${formData.dateArrival}`,
-      timeDeparture: `2024-01-25 ${formData.timeDeparture}`,
+      dateArrival: `${formData.date} ${formData.dateArrival}`,
+      timeDeparture: `${formData.date} ${formData.timeDeparture}`,
       durationMinutes,
       durationHours: Math.round((durationMinutes / 60) * 100) / 100,
       fraisAnnexes: [],
@@ -60,7 +69,7 @@ export default function TimesheetsTab() {
 
     addTimesheet(newTimesheet);
     setShowModal(false);
-    setFormData({ clientId: clients[0]?.id || '', dateArrival: '', timeDeparture: '' });
+    setFormData({ clientId: clients[0]?.id || '', date: todayStr(), dateArrival: '', timeDeparture: '' });
   };
 
   const renderTimesheet = ({ item }: { item: Timesheet }) => {
@@ -121,6 +130,14 @@ export default function TimesheetsTab() {
             <View style={styles.picker}>
               <Text>{clients.find((c) => c.id === formData.clientId)?.name}</Text>
             </View>
+
+            <Text style={styles.label}>Date (AAAA-MM-JJ)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="2025-03-29"
+              value={formData.date}
+              onChangeText={(text) => setFormData({ ...formData, date: text })}
+            />
 
             <Text style={styles.label}>Heure Arrivée (HH:mm)</Text>
             <TextInput

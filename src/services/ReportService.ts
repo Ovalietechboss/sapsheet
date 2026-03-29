@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Timesheet } from '../stores/timesheetStore.supabase';
 
 export interface MonthlyReport {
@@ -34,14 +33,16 @@ export class ReportService {
     clientMap: { [id: string]: string } // clientId => clientName
   ): MonthlyReport {
     // Filter timesheets for month & assistant
-    const monthTimesheets = timesheets.filter(
-      (ts) => ts.dateArrival.startsWith(month) && ts.assistantId === assistantId
-    );
+    const monthTimesheets = timesheets.filter((ts) => {
+      const d = new Date(ts.date_arrival);
+      const tsMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      return tsMonth === month && ts.user_id === assistantId;
+    });
 
     // Calculate totals
-    const totalHoursWorked = monthTimesheets.reduce((sum, ts) => sum + ts.durationHours, 0);
+    const totalHoursWorked = monthTimesheets.reduce((sum, ts) => sum + ts.duration, 0);
     const totalFraisAnnexes = monthTimesheets.reduce(
-      (sum, ts) => sum + ts.fraisAnnexes.reduce((fsum, f) => fsum + f.montant, 0),
+      (sum, ts) => sum + (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0),
       0
     );
 
@@ -55,19 +56,17 @@ export class ReportService {
     } = {};
 
     monthTimesheets.forEach((ts) => {
-      if (!clientBreakdownMap[ts.clientId]) {
-        clientBreakdownMap[ts.clientId] = {
+      if (!clientBreakdownMap[ts.client_id]) {
+        clientBreakdownMap[ts.client_id] = {
           hours: 0,
           earnings: 0,
           lastDate: '',
         };
       }
-      clientBreakdownMap[ts.clientId].hours += ts.durationHours;
-      clientBreakdownMap[ts.clientId].earnings += ts.fraisAnnexes.reduce(
-        (sum, f) => sum + f.montant,
-        0
-      );
-      clientBreakdownMap[ts.clientId].lastDate = ts.dateArrival;
+      clientBreakdownMap[ts.client_id].hours += ts.duration;
+      clientBreakdownMap[ts.client_id].earnings +=
+        (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0);
+      clientBreakdownMap[ts.client_id].lastDate = new Date(ts.date_arrival).toISOString();
     });
 
     const clientBreakdown = Object.entries(clientBreakdownMap).map(
@@ -82,12 +81,12 @@ export class ReportService {
 
     // Chronological summary
     const timesheetSummary = monthTimesheets
-      .sort((a, b) => a.dateArrival.localeCompare(b.dateArrival))
+      .sort((a, b) => a.date_arrival - b.date_arrival)
       .map((ts) => ({
-        date: ts.dateArrival.substring(0, 10),
-        duration: ts.durationHours,
-        clients: [clientMap[ts.clientId] || ts.clientId],
-        frais: ts.fraisAnnexes.reduce((sum, f) => sum + f.montant, 0),
+        date: new Date(ts.date_arrival).toISOString().substring(0, 10),
+        duration: ts.duration,
+        clients: [clientMap[ts.client_id] || ts.client_id],
+        frais: (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0),
       }));
 
     return {

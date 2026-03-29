@@ -8,17 +8,27 @@ export default function TimesheetsTab() {
   const [showModal, setShowModal] = useState(false);
   
   console.log('[TimesheetsTab] Rendered. Timesheets:', timesheets.length, 'Clients:', clients.length);
-  const [formData, setFormData] = useState({
+  const todayStr = () => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const emptyForm = () => ({
     client_id: '',
-    date_arrival: '',
+    date_arrival: todayStr(),
     time_arrival: '',
-    date_departure: '',
+    date_departure: todayStr(),
     time_departure: '',
     frais_repas: 0,
     frais_transport: 0,
     frais_autres: 0,
     notes: '',
   });
+
+  const [formData, setFormData] = useState(emptyForm);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,17 +56,7 @@ export default function TimesheetsTab() {
     });
 
     setShowModal(false);
-    setFormData({
-      client_id: '',
-      date_arrival: '',
-      time_arrival: '',
-      date_departure: '',
-      time_departure: '',
-      frais_repas: 0,
-      frais_transport: 0,
-      frais_autres: 0,
-      notes: '',
-    });
+    setFormData(emptyForm());
   };
 
   const formatDate = (timestamp: number) => {
@@ -215,7 +215,7 @@ export default function TimesheetsTab() {
                   <input
                     type="date"
                     value={formData.date_arrival}
-                    onChange={(e) => setFormData({ ...formData, date_arrival: e.target.value })}
+                    onChange={(e) => setFormData({ ...formData, date_arrival: e.target.value, date_departure: e.target.value })}
                     required
                     style={{
                       width: '100%',

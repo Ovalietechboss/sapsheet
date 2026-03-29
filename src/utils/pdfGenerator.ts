@@ -6,7 +6,7 @@ export async function generateAndSharePDF(htmlContent: string, filename: string)
   const isNative = Capacitor.isNativePlatform();
 
   if (!isNative) {
-    // Web: ouvrir pour impression
+    // Web : ouvrir dans une nouvelle fenêtre et lancer l'impression
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.write(htmlContent);
@@ -18,31 +18,68 @@ export async function generateAndSharePDF(htmlContent: string, filename: string)
     return;
   }
 
-  // Mobile: créer fichier HTML en base64 et partager
+  // Android : générer un vrai PDF via html2canvas + jsPDF puis partager
   try {
-    const htmlFilename = `${filename.replace('.pdf', '')}.html`;
-    
-    // Convertir en base64 pour Android
-    const base64Data = btoa(unescape(encodeURIComponent(htmlContent)));
-    
-    // Écrire le fichier
+    // Injecter le HTML dans un conteneur temporaire hors écran
+    const container = document.createElement('div');
+    container.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:white;';
+    container.innerHTML = htmlContent;
+    document.body.appendChild(container);
+
+    // Importer les libs dynamiquement (évite de les charger au démarrage)
+    const [html2canvas, { jsPDF }] = await Promise.all([
+      import('html2canvas').then((m) => m.default),
+      import('jspdf'),
+    ]);
+
+    // Rendre le HTML en canvas
+    const canvas = await html2canvas(container, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
+    });
+
+    document.body.removeChild(container);
+
+    // Construire le PDF A4
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const imgW = pageW;
+    const imgH = (canvas.height * imgW) / canvas.width;
+    const imgData = canvas.toDataURL('image/png');
+
+    let yOffset = 0;
+    let remaining = imgH;
+
+    pdf.addImage(imgData, 'PNG', 0, yOffset, imgW, imgH);
+    remaining -= pageH;
+
+    while (remaining > 0) {
+      yOffset -= pageH;
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, yOffset, imgW, imgH);
+      remaining -= pageH;
+    }
+
+    // Sauvegarder dans le cache et partager
+    const pdfFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
+    const base64 = pdf.output('datauristring').split(',')[1];
+
     const result = await Filesystem.writeFile({
-      path: htmlFilename,
-      data: base64Data,
+      path: pdfFilename,
+      data: base64,
       directory: Directory.Cache,
     });
 
-    console.log('File created:', result.uri);
-
-    // Partager le fichier
     await Share.share({
-      title: 'Facture',
-      text: 'Ouvrez avec Chrome pour imprimer en PDF',
+      title: pdfFilename,
       url: result.uri,
-      dialogTitle: 'Partager la facture',
+      dialogTitle: 'Partager le PDF',
     });
   } catch (error: any) {
-    console.error('Share error:', error);
-    alert(`Erreur: ${error?.message || 'Impossible de créer le fichier'}`);
+    console.error('Erreur génération PDF:', error);
+    alert(`Erreur PDF : ${error?.message || 'Impossible de générer le fichier'}`);
   }
 }

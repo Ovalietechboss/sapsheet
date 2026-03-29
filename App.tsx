@@ -3,6 +3,7 @@ import { useAuthStore } from './src/stores/authStore';
 import { useClientStore } from './src/stores/clientStore.supabase';
 import { useTimesheetStore } from './src/stores/timesheetStore.supabase';
 import { useInvoiceStore } from './src/stores/invoiceStore.supabase';
+import { useMandataireStore } from './src/stores/mandataireStore.supabase';
 import LoginPage from './src/pages/LoginPage';
 import HomePage from './src/pages/HomePage';
 
@@ -11,6 +12,7 @@ export default function App() {
   const { hydrateClients } = useClientStore();
   const { hydrateTimesheets } = useTimesheetStore();
   const { hydrateInvoices } = useInvoiceStore();
+  const { hydrateMandataires } = useMandataireStore();
   const [isHydrating, setIsHydrating] = useState(false);
 
   // Vérifier la session existante au démarrage
@@ -25,6 +27,7 @@ export default function App() {
       Promise.all([
         loadUser().catch(err => console.error('User load error:', err)),
         hydrateClients().catch(err => console.error('Clients hydration error:', err)),
+        hydrateMandataires().catch(err => console.error('Mandataires hydration error:', err)),
         hydrateTimesheets().catch(err => console.error('Timesheets hydration error:', err)),
         hydrateInvoices().catch(err => console.error('Invoices hydration error:', err)),
       ]).finally(() => setIsHydrating(false));

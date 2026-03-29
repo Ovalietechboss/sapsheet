@@ -1,4 +1,7 @@
 import React, { useState, useMemo } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 import { useTimesheetStore } from '../stores/timesheetStore.supabase';
 import { useClientStore } from '../stores/clientStore.supabase';
 import { useAuthStore } from '../stores/authStore';
@@ -74,7 +77,7 @@ export default function ReportsTab() {
   }, [timesheets, clients, selectedYear, selectedMonth]);
 
   // ─── Export CSV ─────────────────────────────────────────
-  const exportToCSV = () => {
+  const buildCSV = () => {
     const headers = ['Date', 'Client', 'Arrivée', 'Départ', 'Heures', 'Taux', 'Salaire', 'Frais Repas', 'Frais Transport', 'Frais Autres', 'Total'];
     const rows = monthlyData.monthTimesheets.map((ts) => {
       const client = clients.find((c) => c.id === ts.client_id);
@@ -95,12 +98,40 @@ export default function ReportsTab() {
         total.toFixed(2),
       ].join(';');
     });
-    const csv = [headers.join(';'), ...rows].join('\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `rapport_${selectedYear}_${String(selectedMonth + 1).padStart(2, '0')}.csv`;
-    link.click();
+    return [headers.join(';'), ...rows].join('\n');
+  };
+
+  const exportToCSV = async () => {
+    const filename = `rapport_${selectedYear}_${String(selectedMonth + 1).padStart(2, '0')}.csv`;
+    const csv = '\uFEFF' + buildCSV(); // BOM UTF-8 pour Excel
+
+    if (Capacitor.isNativePlatform()) {
+      // Android : écrire le fichier via Filesystem puis partager
+      try {
+        const base64 = btoa(unescape(encodeURIComponent(csv)));
+        const result = await Filesystem.writeFile({
+          path: filename,
+          data: base64,
+          directory: Directory.Cache,
+        });
+        await Share.share({
+          title: 'Export CSV',
+          text: 'Rapport mensuel SAP Sheet',
+          url: result.uri,
+          dialogTitle: 'Partager le fichier CSV',
+        });
+      } catch (error: any) {
+        alert(`Erreur export CSV : ${error?.message || 'Impossible de créer le fichier'}`);
+      }
+    } else {
+      // Web : téléchargement direct via lien
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
   };
 
   // ─── Génération PDF par client ───────────────────────────
@@ -116,13 +147,9 @@ export default function ReportsTab() {
       const invoiceData: any = {
         invoice_number: `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${client.name.substring(0, 3).toUpperCase()}`,
         created_at: Date.now(),
-        totalHours: hours,
-        hourlyRate: client.hourly_rate,
-        totalFrais: frais,
-        totalAmount: earnings + frais,
-        mandataire: client.mandataire_name
-          ? { name: client.mandataire_name, email: client.mandataire_email, siren: client.mandataire_siren }
-          : null,
+        total_amount: earnings + frais,
+        month: selectedMonth + 1,
+        year: selectedYear,
       };
 
       const userForTemplate = {
