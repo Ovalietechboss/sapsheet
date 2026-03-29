@@ -154,7 +154,7 @@ export default function AdminPage() {
       {/* Sidebar */}
       <div style={{ width: '220px', backgroundColor: '#1a1a2e', color: 'white', padding: '24px 16px', display: 'flex', flexDirection: 'column' }}>
         <div style={{ marginBottom: '32px' }}>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>SAP Sheet</h2>
+          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>DomiTemps</h2>
           <span style={{ display: 'inline-block', background: '#ff3b30', color: 'white', padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold', marginTop: '6px', letterSpacing: '0.5px' }}>ADMIN</span>
         </div>
         <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>

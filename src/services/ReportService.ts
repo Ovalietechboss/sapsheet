@@ -105,7 +105,7 @@ export class ReportService {
    * Export report to CSV format
    */
   static exportToCSV(report: MonthlyReport): string {
-    let csv = 'SAP Sheet - Rapport Mensuel\n';
+    let csv = 'DomiTemps - Rapport Mensuel\n';
     csv += `Mois,${report.month}\n`;
     csv += `Heures totales,${report.totalHoursWorked}\n`;
     csv += `Frais annexes,${report.totalFraisAnnexes}\n\n`;

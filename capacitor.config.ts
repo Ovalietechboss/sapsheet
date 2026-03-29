@@ -1,8 +1,8 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.sapsheet.app',
-  appName: 'SAP Sheet',
+  appId: 'com.domitemps.app',
+  appName: 'DomiTemps',
   webDir: 'dist',
   server: {
     androidScheme: 'https',

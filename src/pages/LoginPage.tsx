@@ -115,7 +115,7 @@ export default function LoginPage() {
         {/* Titre */}
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
           <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#1a1a2e', margin: 0 }}>
-            SAP Sheet
+            DomiTemps
           </h1>
           <p style={{ color: '#666', marginTop: '6px', fontSize: '14px' }}>
             Gestion de feuilles de temps

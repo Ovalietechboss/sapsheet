@@ -53,7 +53,7 @@ export default function ResetPasswordPage() {
       <div style={{ backgroundColor: 'white', padding: '40px 36px', borderRadius: '16px', boxShadow: '0 4px 24px rgba(0,0,0,0.10)', width: '100%', maxWidth: '420px' }}>
 
         <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#1a1a2e', margin: 0 }}>SAP Sheet</h1>
+          <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#1a1a2e', margin: 0 }}>DomiTemps</h1>
         </div>
 
         {status === 'success' ? (

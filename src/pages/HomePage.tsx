@@ -141,7 +141,7 @@ export default function HomePage() {
           transition: 'left 0.3s ease',
         }}
       >
-        <h2 style={{ marginBottom: '30px', fontSize: '18px' }}>SAP Sheet</h2>
+        <h2 style={{ marginBottom: '30px', fontSize: '18px' }}>DomiTemps</h2>
         <nav style={{ flex: 1 }}>
           {tabs.map((tab) => (
             <button

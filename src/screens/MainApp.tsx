@@ -44,7 +44,7 @@ export default function MainApp() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.title}>SAP Sheet</Text>
+          <Text style={styles.title}>DomiTemps</Text>
           <Text style={styles.userInfo}>
             {user?.displayName} ({user?.type === 'assistant' ? 'Assistante' : 'Employeur'})
           </Text>

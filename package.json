@@ -1,7 +1,7 @@
 {
-  "name": "sap-sheet",
+  "name": "domitemps",
   "version": "1.0.0",
-  "description": "SAP Sheet - Timesheet Management for Home Care Assistants",
+  "description": "DomiTemps - Gestion de temps pour assistantes a domicile",
   "main": "index.ts",
   "scripts": {
     "dev": "vite",

@@ -1,6 +1,6 @@
 {
-  "name": "SAP Sheet",
-  "short_name": "SAP",
+  "name": "DomiTemps",
+  "short_name": "DomiTemps",
   "description": "Gestion des heures et facturation pour assistantes de vie",
   "start_url": "/",
   "scope": "/",

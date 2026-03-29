@@ -29,7 +29,7 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Text style={styles.title}>SAP Sheet</Text>
+          <Text style={styles.title}>DomiTemps</Text>
           <Text style={styles.subtitle}>Timesheet Management</Text>
         </View>
 

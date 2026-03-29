@@ -6,7 +6,7 @@ const ENV: any = (typeof import.meta !== 'undefined' && (import.meta as any).env
 const apiBaseUrl = ENV.VITE_API_URL || '172.18.176.1:4000';
 
 export const APP_CONFIG = {
-  APP_NAME: 'SAP Sheet',
+  APP_NAME: 'DomiTemps',
   VERSION: '1.0.0',
   DB_NAME: 'sap-sheet-db',
   DB_VERSION: 1,

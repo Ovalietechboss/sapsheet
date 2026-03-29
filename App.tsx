@@ -65,7 +65,7 @@ export default function App() {
           }}
         />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        <p style={{ fontSize: '16px', color: '#666', margin: 0 }}>SAP Sheet</p>
+        <p style={{ fontSize: '16px', color: '#666', margin: 0 }}>DomiTemps</p>
       </div>
     );
   }

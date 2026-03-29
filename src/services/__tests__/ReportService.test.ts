@@ -160,8 +160,8 @@ describe('ReportService.exportToCSV', () => {
     expect(csv).toContain('2025-03-10');
   });
 
-  it('commence par le titre SAP Sheet', () => {
+  it('commence par le titre DomiTemps', () => {
     const csv = ReportService.exportToCSV(mockReport);
-    expect(csv).toMatch(/^SAP Sheet/);
+    expect(csv).toMatch(/^DomiTemps/);
   });
 });
