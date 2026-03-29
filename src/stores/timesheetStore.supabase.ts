@@ -12,6 +12,9 @@ export interface Timesheet {
   frais_repas: number;
   frais_transport: number;
   frais_autres: number;
+  ik_km: number;
+  ik_rate: number;
+  ik_amount: number;
   notes?: string;
   status: 'draft' | 'validated';
   created_at: number;

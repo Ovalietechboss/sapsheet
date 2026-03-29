@@ -19,6 +19,8 @@ export default function TimesheetsTab() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
+  const DEFAULT_IK_RATE = 0.603;
+
   const emptyForm = () => ({
     client_id: '',
     date_arrival: todayStr(),
@@ -28,6 +30,9 @@ export default function TimesheetsTab() {
     frais_repas: 0,
     frais_transport: 0,
     frais_autres: 0,
+    ik_km: 0,
+    ik_rate: DEFAULT_IK_RATE,
+    ik_amount: 0,
     notes: '',
   });
 
@@ -54,6 +59,9 @@ export default function TimesheetsTab() {
       frais_repas: ts.frais_repas || 0,
       frais_transport: ts.frais_transport || 0,
       frais_autres: ts.frais_autres || 0,
+      ik_km: ts.ik_km || 0,
+      ik_rate: ts.ik_rate || DEFAULT_IK_RATE,
+      ik_amount: ts.ik_amount || 0,
       notes: ts.notes || '',
     });
     setEditingId(ts.id);
@@ -78,6 +86,9 @@ export default function TimesheetsTab() {
       frais_repas: parseFloat(formData.frais_repas.toString()) || 0,
       frais_transport: parseFloat(formData.frais_transport.toString()) || 0,
       frais_autres: parseFloat(formData.frais_autres.toString()) || 0,
+      ik_km: parseFloat(formData.ik_km.toString()) || 0,
+      ik_rate: parseFloat(formData.ik_rate.toString()) || 0,
+      ik_amount: parseFloat(formData.ik_amount.toString()) || 0,
       notes: formData.notes,
     };
 
@@ -143,8 +154,9 @@ export default function TimesheetsTab() {
                 <p style={{ color: '#007AFF', fontWeight: 'bold', fontSize: '15px', marginBottom: '4px' }}>
                   {ts.duration.toFixed(2)}h
                 </p>
-                {(ts.frais_repas > 0 || ts.frais_transport > 0 || ts.frais_autres > 0) && (
+                {(ts.frais_repas > 0 || ts.frais_transport > 0 || ts.frais_autres > 0 || ts.ik_amount > 0) && (
                   <div style={{ fontSize: '13px', color: '#888', marginTop: '6px' }}>
+                    {ts.ik_amount > 0 && <span>IK: {ts.ik_km}km × {ts.ik_rate}€ = {ts.ik_amount.toFixed(2)}€ </span>}
                     {ts.frais_repas > 0 && <span>Repas: {ts.frais_repas}€ </span>}
                     {ts.frais_transport > 0 && <span>Transport: {ts.frais_transport}€ </span>}
                     {ts.frais_autres > 0 && <span>Autres: {ts.frais_autres}€</span>}
@@ -223,6 +235,38 @@ export default function TimesheetsTab() {
                 </div>
               </div>
 
+              {/* Indemnités kilométriques */}
+              <div style={{ marginBottom: '14px', paddingTop: '12px', borderTop: '1px solid #eee' }}>
+                <label style={{ ...labelStyle, marginBottom: '10px' }}>Indemnités kilométriques</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={{ ...labelStyle, fontSize: '11px', color: '#888' }}>Km parcourus</label>
+                    <input type="number" step="0.1" value={formData.ik_km}
+                      onChange={(e) => {
+                        const km = parseFloat(e.target.value) || 0;
+                        setFormData({ ...formData, ik_km: km, ik_amount: Math.round(km * formData.ik_rate * 100) / 100 });
+                      }}
+                      style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={{ ...labelStyle, fontSize: '11px', color: '#888' }}>Tarif/km (€)</label>
+                    <input type="number" step="0.001" value={formData.ik_rate}
+                      onChange={(e) => {
+                        const rate = parseFloat(e.target.value) || 0;
+                        setFormData({ ...formData, ik_rate: rate, ik_amount: Math.round(formData.ik_km * rate * 100) / 100 });
+                      }}
+                      style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={{ ...labelStyle, fontSize: '11px', color: '#888' }}>Montant IK (€)</label>
+                    <input type="number" step="0.01" value={formData.ik_amount}
+                      onChange={(e) => setFormData({ ...formData, ik_amount: parseFloat(e.target.value) || 0 })}
+                      style={{ ...inputStyle, fontWeight: 'bold', color: '#007AFF' }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Autres frais */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '14px' }}>
                 <div>
                   <label style={labelStyle}>Repas (€)</label>
