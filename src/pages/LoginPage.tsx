@@ -8,6 +8,8 @@ const ALLOW_SIGNUP = import.meta.env.VITE_ALLOW_SIGNUP === 'true';
 
 export default function LoginPage() {
   const [mode, setMode] = useState<Mode>('login');
+  const [signupDone, setSignupDone] = useState(false);
+  const [signupEmail, setSignupEmail] = useState('');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
@@ -52,6 +54,8 @@ export default function LoginPage() {
       }
       try {
         await signup(email, password, type, displayName);
+        setSignupEmail(email);
+        setSignupDone(true);
       } catch {
         // handled by store
       }
@@ -117,6 +121,30 @@ export default function LoginPage() {
             Gestion de feuilles de temps
           </p>
         </div>
+
+        {/* Écran post-inscription : vérification email */}
+        {signupDone ? (
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '52px', marginBottom: '16px' }}>📧</div>
+            <h2 style={{ marginBottom: '10px', fontSize: '22px' }}>Vérifiez vos emails</h2>
+            <p style={{ color: '#555', lineHeight: '1.6', marginBottom: '8px' }}>
+              Un email de confirmation a été envoyé à
+            </p>
+            <p style={{ fontWeight: '700', color: '#007AFF', marginBottom: '20px', wordBreak: 'break-all' }}>
+              {signupEmail}
+            </p>
+            <p style={{ color: '#888', fontSize: '13px', marginBottom: '28px' }}>
+              Cliquez sur le lien dans l'email pour activer votre compte. Pensez à vérifier vos spams.
+            </p>
+            <button
+              onClick={() => { setSignupDone(false); setMode('login'); }}
+              style={{ width: '100%', padding: '13px', backgroundColor: '#007AFF', color: 'white', border: 'none', borderRadius: '10px', fontSize: '16px', fontWeight: '700', cursor: 'pointer' }}
+            >
+              Aller à la connexion
+            </button>
+          </div>
+        ) : (
+        <>
 
         {/* Onglets — visibles seulement si les inscriptions sont ouvertes */}
         {ALLOW_SIGNUP && (
@@ -304,6 +332,8 @@ export default function LoginPage() {
               {mode === 'login' ? 'Créer un compte' : 'Se connecter'}
             </button>
           </p>
+        )}
+        </>
         )}
       </div>
     </div>
