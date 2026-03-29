@@ -7,7 +7,9 @@ export interface User {
   type: 'assistant' | 'employer';
   role: 'user' | 'admin';
   email: string;
+  first_name?: string;
   display_name: string;
+  avatar_url?: string;
   created_at: number;
   updated_at: number;
   address?: string;
@@ -51,6 +53,8 @@ function mapDbUser(data: Record<string, unknown>): User {
     display_name: (data.display_name as string) || '',
     type: data.type as 'assistant' | 'employer',
     role: (data.role as 'user' | 'admin') || 'user',
+    first_name: data.first_name as string | undefined,
+    avatar_url: data.avatar_url as string | undefined,
     created_at: data.created_at as number,
     updated_at: data.updated_at as number,
     address: data.address as string | undefined,

@@ -28,7 +28,7 @@ export default function DashboardTab({ onNavigate }: Props) {
   const currentYear = now.getFullYear();
   const todayStr = `${JOURS[now.getDay()]} ${now.getDate()} ${MONTHS[currentMonth]}`;
 
-  const firstName = user?.display_name?.split(' ')[0] || 'Bonjour';
+  const firstName = user?.first_name || user?.display_name?.split(' ')[0] || '';
 
   // Stats du mois en cours
   const monthStats = useMemo(() => {
@@ -81,10 +81,21 @@ export default function DashboardTab({ onNavigate }: Props) {
       }}>
         <div style={{ position: 'absolute', top: '-30px', right: '-20px', width: '140px', height: '140px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }} />
         <div style={{ position: 'absolute', bottom: '-40px', right: '60px', width: '100px', height: '100px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
-        <p style={{ fontSize: '14px', opacity: 0.85, marginBottom: '6px' }}>{todayStr}</p>
-        <h1 style={{ fontSize: '26px', fontWeight: '700', margin: '0 0 4px' }}>
-          {greeting}, {firstName}
-        </h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {user?.avatar_url ? (
+            <img src={user.avatar_url} alt="" style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(255,255,255,0.3)' }} />
+          ) : (
+            <div style={{ width: 56, height: 56, borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', fontWeight: 'bold' }}>
+              {(firstName || 'U').charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div>
+            <p style={{ fontSize: '14px', opacity: 0.85, marginBottom: '4px', margin: 0 }}>{todayStr}</p>
+            <h1 style={{ fontSize: '26px', fontWeight: '700', margin: '0 0 4px' }}>
+              {greeting}, {firstName}
+            </h1>
+          </div>
+        </div>
         <p style={{ fontSize: '15px', opacity: 0.8, margin: 0 }}>
           {monthStats.count === 0
             ? `Aucun pointage ce mois — c'est le moment de commencer !`
