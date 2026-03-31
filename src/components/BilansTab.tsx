@@ -162,19 +162,25 @@ export default function BilansTab() {
       const client = clients.find((c) => c.id === row.clientId)!;
       const cts = monthTimesheets.filter((ts) => ts.client_id === client.id);
 
+      const isCESU = client.facturation_mode === 'CESU';
+      const clientTag = client.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_àâäéèêëïîôùûüçÀÂÄÉÈÊËÏÎÔÙÛÜÇ]/g, '');
+      const invoiceNumber = isCESU
+        ? `CESU-${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${clientTag}`
+        : `FAC-${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${clientTag}`;
+
       const invoiceData: any = {
-        invoice_number: `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${client.name.substring(0, 3).toUpperCase()}`,
+        invoice_number: invoiceNumber,
         created_at: Date.now(),
         total_amount: row.totalAmount,
         month: selectedMonth,
         year: selectedYear,
       };
 
-      const html = client.facturation_mode === 'CESU'
+      const html = isCESU
         ? generateCESUTemplate(invoiceData, client, cts, userProfile, row.mandataire)
         : generateClassicalTemplate(invoiceData, client, cts, userProfile, row.mandataire);
 
-      const filename = `pointage_${client.name.replace(/\s+/g, '_')}_${MONTHS[selectedMonth - 1]}_${selectedYear}`;
+      const filename = `${invoiceNumber}`;
       await generateAndSharePDF(html, filename);
 
       await upsertClientStatus(period.id, client.id, {
