@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import { useAuthStore } from '../stores/authStore';
 import { useTimesheetStore } from '../stores/timesheetStore.supabase';
 import { useClientStore } from '../stores/clientStore.supabase';
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export default function DashboardTab({ onNavigate }: Props) {
+  const isMobile = useIsMobile();
   const { user } = useAuthStore();
   const { timesheets } = useTimesheetStore();
   const { clients } = useClientStore();
@@ -170,7 +172,7 @@ export default function DashboardTab({ onNavigate }: Props) {
       </div>
 
       {/* Stats du mois */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px', marginBottom: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(5, 1fr)', gap: '10px', marginBottom: '20px' }}>
         <StatCard label="Heures" value={`${monthStats.totalHours.toFixed(1)}h`} bg="#EBF9F0" color="#2d8a4e" />
         <StatCard label="Clients actifs" value={String(monthStats.activeClients)} bg="#E8F4FF" color="#1a6fb5" />
         <StatCard label="Pointages" value={String(monthStats.count)} sub={`${monthStats.totalHours.toFixed(1)}h`} bg="#FFF4E5" color="#b36b00" />
@@ -178,8 +180,8 @@ export default function DashboardTab({ onNavigate }: Props) {
         <StatCard label="Total" value={`${(monthStats.totalEarnings + monthStats.totalFrais).toFixed(0)}€`} bg="#007AFF" color="#fff" />
       </div>
 
-      {/* Évolution 6 mois + Répartition */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px', marginBottom: '20px' }}>
+      {/* Évolution 6 mois + Répartition (web only) */}
+      {!isMobile && <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '16px', marginBottom: '20px' }}>
         {/* Évolution */}
         <div style={{ background: 'white', border: '1px solid #eee', borderRadius: '12px', padding: '20px' }}>
           <h3 style={{ margin: '0 0 16px', fontSize: '15px', color: '#333' }}>Évolution (6 mois)</h3>
@@ -231,10 +233,10 @@ export default function DashboardTab({ onNavigate }: Props) {
             </div>
           </div>
         </div>
-      </div>
+      </div>}
 
-      {/* Top clients + Alertes */}
-      <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '16px', marginBottom: '20px' }}>
+      {/* Top clients + Alertes (web only) */}
+      {!isMobile && <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: '16px', marginBottom: '20px' }}>
         {/* Top clients */}
         <div style={{ background: 'white', border: '1px solid #eee', borderRadius: '12px', padding: '20px' }}>
           <h3 style={{ margin: '0 0 14px', fontSize: '15px', color: '#333' }}>Top clients — {MONTHS[currentMonth]}</h3>
@@ -291,10 +293,10 @@ export default function DashboardTab({ onNavigate }: Props) {
             </div>
           </div>
         </div>
-      </div>
+      </div>}
 
-      {/* Cumul annuel */}
-      <div style={{ background: 'white', border: '1px solid #eee', borderRadius: '12px', padding: '18px 20px', marginBottom: '20px', display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
+      {/* Cumul annuel (web only) */}
+      {!isMobile && <div style={{ background: 'white', border: '1px solid #eee', borderRadius: '12px', padding: '18px 20px', marginBottom: '20px', display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
         <div>
           <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', marginBottom: '4px' }}>Année {currentYear}</div>
           <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#333' }}>{yearStats.hours.toFixed(0)}h</div>
@@ -306,7 +308,7 @@ export default function DashboardTab({ onNavigate }: Props) {
           <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#34C759' }}>{yearStats.revenue.toFixed(0)}€</div>
           <div style={{ fontSize: '12px', color: '#888' }}>{clients.length} clients · {mandataires.length} mandataires</div>
         </div>
-      </div>
+      </div>}
 
       {/* Derniers pointages */}
       <div style={{ marginBottom: '20px' }}>
