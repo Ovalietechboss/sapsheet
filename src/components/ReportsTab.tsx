@@ -4,6 +4,7 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { useTimesheetStore } from '../stores/timesheetStore.supabase';
 import { useClientStore } from '../stores/clientStore.supabase';
+import { useMandataireStore } from '../stores/mandataireStore.supabase';
 import { useAuthStore } from '../stores/authStore';
 import { generateCESUTemplate, generateClassicalTemplate } from '../services/InvoiceTemplates';
 import { generateAndSharePDF } from '../utils/pdfGenerator';
@@ -16,6 +17,7 @@ const MONTHS = [
 export default function ReportsTab() {
   const { timesheets } = useTimesheetStore();
   const { clients } = useClientStore();
+  const { mandataires } = useMandataireStore();
   const { user } = useAuthStore();
 
   const currentDate = new Date();
@@ -166,9 +168,13 @@ export default function ReportsTab() {
         bic: user.bic,
       };
 
+      const mandataire = client.mandataire_id
+        ? mandataires.find((m) => m.id === client.mandataire_id)
+        : undefined;
+
       const html = isCESU
-        ? generateCESUTemplate(invoiceData, client, clientTimesheets, userForTemplate)
-        : generateClassicalTemplate(invoiceData, client, clientTimesheets, userForTemplate);
+        ? generateCESUTemplate(invoiceData, client, clientTimesheets, userForTemplate, mandataire)
+        : generateClassicalTemplate(invoiceData, client, clientTimesheets, userForTemplate, mandataire);
 
       const filename = isCESU
         ? `pointage_cesu_${client.name}_${selectedYear}_${String(selectedMonth + 1).padStart(2, '0')}.pdf`
