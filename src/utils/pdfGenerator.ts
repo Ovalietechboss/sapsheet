@@ -4,21 +4,8 @@ import { Share } from '@capacitor/share';
 
 export async function generateAndSharePDF(htmlContent: string, filename: string): Promise<void> {
   const isNative = Capacitor.isNativePlatform();
+  const pdfFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
 
-  if (!isNative) {
-    // Web : ouvrir dans une nouvelle fenêtre et lancer l'impression
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-      printWindow.onload = () => {
-        setTimeout(() => printWindow.print(), 500);
-      };
-    }
-    return;
-  }
-
-  // Android : générer un vrai PDF via html2canvas + jsPDF puis partager
   try {
     // Injecter le HTML dans un conteneur temporaire hors écran
     const container = document.createElement('div');
@@ -26,7 +13,7 @@ export async function generateAndSharePDF(htmlContent: string, filename: string)
     container.innerHTML = htmlContent;
     document.body.appendChild(container);
 
-    // Importer les libs dynamiquement (évite de les charger au démarrage)
+    // Importer les libs dynamiquement
     const [html2canvas, { jsPDF }] = await Promise.all([
       import('html2canvas').then((m) => m.default),
       import('jspdf'),
@@ -63,21 +50,23 @@ export async function generateAndSharePDF(htmlContent: string, filename: string)
       remaining -= pageH;
     }
 
-    // Sauvegarder dans le cache et partager
-    const pdfFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
-    const base64 = pdf.output('datauristring').split(',')[1];
-
-    const result = await Filesystem.writeFile({
-      path: pdfFilename,
-      data: base64,
-      directory: Directory.Cache,
-    });
-
-    await Share.share({
-      title: pdfFilename,
-      url: result.uri,
-      dialogTitle: 'Partager le PDF',
-    });
+    if (isNative) {
+      // Android : sauvegarder + partager
+      const base64 = pdf.output('datauristring').split(',')[1];
+      const result = await Filesystem.writeFile({
+        path: pdfFilename,
+        data: base64,
+        directory: Directory.Cache,
+      });
+      await Share.share({
+        title: pdfFilename,
+        url: result.uri,
+        dialogTitle: 'Partager le PDF',
+      });
+    } else {
+      // Web : téléchargement direct
+      pdf.save(pdfFilename);
+    }
   } catch (error: any) {
     console.error('Erreur génération PDF:', error);
     alert(`Erreur PDF : ${error?.message || 'Impossible de générer le fichier'}`);
