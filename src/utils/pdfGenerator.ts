@@ -2,16 +2,13 @@ import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
-// Marges en mm
-const MARGIN = 10;
+const MARGIN = 10; // mm
 
 export async function generateAndSharePDF(htmlContent: string, filename: string): Promise<void> {
   const isNative = Capacitor.isNativePlatform();
   const pdfFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
 
   try {
-    // Largeur du conteneur HTML = A4 (210mm) - marges (2×10mm) à 96dpi ≈ 718px
-    // On utilise 720px pour un chiffre rond
     const containerWidth = 760;
 
     const container = document.createElement('div');
@@ -24,7 +21,6 @@ export async function generateAndSharePDF(htmlContent: string, filename: string)
       import('jspdf'),
     ]);
 
-    // Attendre le rendu complet
     await new Promise((r) => setTimeout(r, 100));
 
     const canvas = await html2canvas(container, {
@@ -44,29 +40,32 @@ export async function generateAndSharePDF(htmlContent: string, filename: string)
     const printW = pageW - 2 * MARGIN;                 // 190mm
     const printH = pageH - 2 * MARGIN;                 // 277mm
 
-    // Dimensions de l'image dans le PDF
     const imgW = printW;
     const imgH = (canvas.height * imgW) / canvas.width;
 
-    if (imgH <= printH) {
-      // Tout tient sur une page
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', MARGIN, MARGIN, imgW, imgH);
+    // Si ça dépasse d'au max 15% → réduire pour tout mettre sur une page
+    if (imgH <= printH * 1.15) {
+      const finalH = Math.min(imgH, printH);
+      const finalW = imgH <= printH ? imgW : (canvas.width * finalH) / canvas.height;
+      const offsetX = imgH <= printH ? MARGIN : MARGIN + (printW - finalW) / 2;
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', offsetX, MARGIN, finalW, finalH);
     } else {
-      // Multi-page : découper le canvas en tranches
-      const totalPages = Math.ceil(imgH / printH);
-      const sliceHeight = Math.floor(canvas.height / totalPages);
+      // Vrai multi-page : découper en tranches propres
+      const pxPerPage = Math.floor((printH / imgH) * canvas.height);
+      const totalPages = Math.ceil(canvas.height / pxPerPage);
 
       for (let page = 0; page < totalPages; page++) {
         if (page > 0) pdf.addPage();
 
-        const srcY = page * sliceHeight;
-        const srcH = Math.min(sliceHeight, canvas.height - srcY);
+        const srcY = page * pxPerPage;
+        const srcH = Math.min(pxPerPage, canvas.height - srcY);
 
-        // Créer un canvas pour cette tranche
         const sliceCanvas = document.createElement('canvas');
         sliceCanvas.width = canvas.width;
         sliceCanvas.height = srcH;
         const ctx = sliceCanvas.getContext('2d')!;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
         ctx.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
 
         const sliceImgH = (srcH * imgW) / canvas.width;
