@@ -142,7 +142,7 @@ export default function DashboardTab({ onNavigate }: Props) {
           icon="📊"
           title="Rapports & export"
           subtitle="CSV, PDF, statistiques"
-          onClick={() => onNavigate('reports')}
+          onClick={() => onNavigate('bilans')}
           bg="#AF52DE"
         />
       </div>
