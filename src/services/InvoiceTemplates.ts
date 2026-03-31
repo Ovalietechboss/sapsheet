@@ -75,30 +75,33 @@ export const generateCESUTemplate = (
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; font-size: 12px; color: #333; padding: 30px; }
-    .header { border-bottom: 3px solid #34C759; padding-bottom: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+    .header { border-bottom: 3px solid #34C759; padding-bottom: 16px; margin-bottom: 20px; overflow: hidden; }
+    .header-left { float: left; width: 65%; }
     .header-left .badge { display: inline-block; background: #34C759; color: white; padding: 4px 12px; border-radius: 4px; font-weight: bold; font-size: 11px; margin-bottom: 6px; }
     .header-left h1 { font-size: 20px; color: #222; margin-bottom: 4px; }
     .header-left p { color: #666; font-size: 12px; }
-    .header-right { text-align: right; font-size: 12px; color: #555; }
+    .header-right { float: right; text-align: right; width: 30%; font-size: 12px; color: #555; }
     .header-right strong { font-size: 13px; color: #34C759; }
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-    .info-box { padding: 12px; background: #f9f9f9; border-radius: 4px; border-left: 3px solid #34C759; }
+    .info-grid { overflow: hidden; margin-bottom: 20px; }
+    .info-box { width: 48%; float: left; margin-right: 2%; padding: 12px; background: #f9f9f9; border-radius: 4px; border-left: 3px solid #34C759; }
+    .info-box:last-child { margin-right: 0; }
     .info-box h3 { font-size: 10px; text-transform: uppercase; color: #34C759; margin-bottom: 6px; letter-spacing: 0.5px; }
     .info-box p { font-size: 12px; margin-bottom: 2px; color: #444; }
-    .section-title { background: #f0f0f0; padding: 7px 10px; font-weight: bold; font-size: 12px; margin-bottom: 0; border-left: 4px solid #34C759; }
+    .section-title { background: #f0f0f0; padding: 7px 10px; font-weight: bold; font-size: 12px; margin-bottom: 0; border-left: 4px solid #34C759; clear: both; }
     table { width: 100%; border-collapse: collapse; font-size: 11px; }
     th { background: #34C759; color: white; padding: 8px 6px; text-align: left; font-size: 11px; }
     td { padding: 6px; border-bottom: 1px solid #eee; border-right: 1px solid #eee; }
     tr:nth-child(even) { background: #fafafa; }
     .total-row td { background: #e8f8ed; font-weight: bold; border-top: 2px solid #34C759; padding: 8px 6px; }
-    .recap { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
-    .recap-card { padding: 12px; border-radius: 6px; text-align: center; }
+    .recap { overflow: hidden; margin: 20px 0; }
+    .recap-card { width: 23%; float: left; margin-right: 2%; padding: 12px; border-radius: 6px; text-align: center; }
+    .recap-card:last-child { margin-right: 0; }
     .recap-card .label { font-size: 10px; text-transform: uppercase; opacity: 0.85; margin-bottom: 4px; }
     .recap-card .value { font-size: 18px; font-weight: bold; }
-    .total-box { background: #34C759; color: white; padding: 16px 20px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    .total-box .label { font-size: 13px; opacity: 0.9; }
-    .total-box .amount { font-size: 24px; font-weight: bold; }
-    .footer { border-top: 1px solid #ddd; padding-top: 12px; font-size: 10px; color: #888; }
+    .total-box { background: #34C759; color: white; padding: 16px 20px; border-radius: 6px; overflow: hidden; margin-bottom: 20px; }
+    .total-box .label { float: left; font-size: 13px; opacity: 0.9; line-height: 30px; }
+    .total-box .amount { float: right; font-size: 24px; font-weight: bold; }
+    .footer { border-top: 1px solid #ddd; padding-top: 12px; font-size: 10px; color: #888; clear: both; }
   </style>
 </head>
 <body>
@@ -284,15 +287,19 @@ export const generateClassicalTemplate = (
           border-left: 4px solid #007AFF;
         }
         .info-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 30px;
+          overflow: hidden;
           margin-bottom: 25px;
         }
         .info-box {
+          width: 48%;
+          float: left;
+          margin-right: 2%;
           padding: 15px;
           background-color: #f9f9f9;
           border-radius: 4px;
+        }
+        .info-box:last-child {
+          margin-right: 0;
         }
         .info-box h3 {
           margin-top: 0;

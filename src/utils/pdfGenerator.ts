@@ -12,10 +12,10 @@ export async function generateAndSharePDF(htmlContent: string, filename: string)
   try {
     // Largeur du conteneur HTML = A4 (210mm) - marges (2×10mm) à 96dpi ≈ 718px
     // On utilise 720px pour un chiffre rond
-    const containerWidth = 720;
+    const containerWidth = 760;
 
     const container = document.createElement('div');
-    container.style.cssText = `position:absolute;left:-9999px;top:0;width:${containerWidth}px;background:white;padding:20px;box-sizing:border-box;`;
+    container.style.cssText = `position:absolute;left:-9999px;top:0;width:${containerWidth}px;background:white;`;
     container.innerHTML = htmlContent;
     document.body.appendChild(container);
 
