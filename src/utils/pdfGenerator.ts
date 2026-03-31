@@ -2,56 +2,79 @@ import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
+// Marges en mm
+const MARGIN = 10;
+
 export async function generateAndSharePDF(htmlContent: string, filename: string): Promise<void> {
   const isNative = Capacitor.isNativePlatform();
   const pdfFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
 
   try {
-    // Injecter le HTML dans un conteneur temporaire hors écran
+    // Largeur du conteneur HTML = A4 (210mm) - marges (2×10mm) à 96dpi ≈ 718px
+    // On utilise 720px pour un chiffre rond
+    const containerWidth = 720;
+
     const container = document.createElement('div');
-    container.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:white;';
+    container.style.cssText = `position:absolute;left:-9999px;top:0;width:${containerWidth}px;background:white;padding:20px;box-sizing:border-box;`;
     container.innerHTML = htmlContent;
     document.body.appendChild(container);
 
-    // Importer les libs dynamiquement
     const [html2canvas, { jsPDF }] = await Promise.all([
       import('html2canvas').then((m) => m.default),
       import('jspdf'),
     ]);
 
-    // Rendre le HTML en canvas
+    // Attendre le rendu complet
+    await new Promise((r) => setTimeout(r, 100));
+
     const canvas = await html2canvas(container, {
       scale: 2,
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
+      width: containerWidth,
+      windowWidth: containerWidth,
     });
 
     document.body.removeChild(container);
 
-    // Construire le PDF A4
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const imgW = pageW;
+    const pageW = pdf.internal.pageSize.getWidth();   // 210mm
+    const pageH = pdf.internal.pageSize.getHeight();   // 297mm
+    const printW = pageW - 2 * MARGIN;                 // 190mm
+    const printH = pageH - 2 * MARGIN;                 // 277mm
+
+    // Dimensions de l'image dans le PDF
+    const imgW = printW;
     const imgH = (canvas.height * imgW) / canvas.width;
-    const imgData = canvas.toDataURL('image/png');
 
-    let yOffset = 0;
-    let remaining = imgH;
+    if (imgH <= printH) {
+      // Tout tient sur une page
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', MARGIN, MARGIN, imgW, imgH);
+    } else {
+      // Multi-page : découper le canvas en tranches
+      const totalPages = Math.ceil(imgH / printH);
+      const sliceHeight = Math.floor(canvas.height / totalPages);
 
-    pdf.addImage(imgData, 'PNG', 0, yOffset, imgW, imgH);
-    remaining -= pageH;
+      for (let page = 0; page < totalPages; page++) {
+        if (page > 0) pdf.addPage();
 
-    while (remaining > 0) {
-      yOffset -= pageH;
-      pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, yOffset, imgW, imgH);
-      remaining -= pageH;
+        const srcY = page * sliceHeight;
+        const srcH = Math.min(sliceHeight, canvas.height - srcY);
+
+        // Créer un canvas pour cette tranche
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = srcH;
+        const ctx = sliceCanvas.getContext('2d')!;
+        ctx.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+
+        const sliceImgH = (srcH * imgW) / canvas.width;
+        pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', MARGIN, MARGIN, imgW, sliceImgH);
+      }
     }
 
     if (isNative) {
-      // Android : sauvegarder + partager
       const base64 = pdf.output('datauristring').split(',')[1];
       const result = await Filesystem.writeFile({
         path: pdfFilename,
@@ -64,7 +87,6 @@ export async function generateAndSharePDF(htmlContent: string, filename: string)
         dialogTitle: 'Partager le PDF',
       });
     } else {
-      // Web : téléchargement direct
       pdf.save(pdfFilename);
     }
   } catch (error: any) {
