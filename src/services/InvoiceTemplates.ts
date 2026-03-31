@@ -125,11 +125,11 @@ export const generateCESUTemplate = (
     </div>
     <div class="info-box">
       <h3>Client (Employeur)</h3>
-      <p><strong>${client.name}</strong></p>
+      <p><strong>${[client.titre, client.first_name, client.name].filter(Boolean).join(' ')}</strong></p>
       <p>${client.address}</p>
       ${mandataire ? `
         <p style="margin-top:6px;"><strong>Mandataire :</strong></p>
-        <p>${mandataire.titre ? mandataire.titre + ' ' : ''}${mandataire.name}</p>
+        <p>${[mandataire.titre, mandataire.first_name, mandataire.name].filter(Boolean).join(' ')}</p>
         <p style="font-size:11px;color:#666;">${mandataire.association_name}</p>
         <p style="font-size:11px;color:#666;">${mandataire.email}</p>
         ${mandataire.siren ? `<p style="font-size:11px;color:#999;">SIREN: ${mandataire.siren}</p>` : ''}
@@ -343,12 +343,12 @@ export const generateClassicalTemplate = (
         </div>
         <div class="info-box">
           <h3>Client</h3>
-          <p><strong>${client.name}</strong></p>
+          <p><strong>${[client.titre, client.first_name, client.name].filter(Boolean).join(' ')}</strong></p>
           <p>${client.address}</p>
           ${client.email ? `<p>${client.email}</p>` : ''}
           ${mandataire ? `
             <p style="margin-top: 10px;"><strong>Mandataire :</strong></p>
-            <p>${mandataire.titre ? mandataire.titre + ' ' : ''}${mandataire.name}</p>
+            <p>${[mandataire.titre, mandataire.first_name, mandataire.name].filter(Boolean).join(' ')}</p>
             <p style="color:#666;">${mandataire.association_name}</p>
             <p>${mandataire.email}</p>
             ${mandataire.siren ? `<p><strong>SIREN:</strong> ${mandataire.siren}</p>` : ''}
