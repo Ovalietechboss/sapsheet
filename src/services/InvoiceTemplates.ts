@@ -198,6 +198,7 @@ export const generateCESUTemplate = (
   <div class="footer">
     <p>TVA non applicable, art. 293 B du CGI &nbsp;|&nbsp; Paiement via CESU (Chèque Emploi Service Universel)</p>
     ${user.iban ? `<p style="margin-top:4px;">IBAN : ${user.iban}${user.bic ? ' &nbsp;|&nbsp; BIC : ' + user.bic : ''}</p>` : ''}
+    <p style="margin-top:12px; text-align:center; color:#aaa; font-size:9px; font-style:italic;">Généré par DomiTemps — Au service de celles et ceux qui prennent soin des autres</p>
   </div>
 
 </body>
@@ -424,6 +425,7 @@ export const generateClassicalTemplate = (
         ${user.iban ? `<p><strong>IBAN:</strong> ${user.iban}</p>` : ''}
         ${user.bic ? `<p><strong>BIC:</strong> ${user.bic}</p>` : ''}
         <p style="margin-top: 15px;">Paiement à réception de facture</p>
+        <p style="margin-top:12px; text-align:center; color:#aaa; font-size:9px; font-style:italic;">Généré par DomiTemps — Au service de celles et ceux qui prennent soin des autres</p>
       </div>
     </body>
     </html>
