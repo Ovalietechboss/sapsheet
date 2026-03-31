@@ -46,7 +46,8 @@ export const generateCESUTemplate = (
   const totalRepas = sorted.reduce((sum, ts) => sum + (ts.frais_repas || 0), 0);
   const totalTransport = sorted.reduce((sum, ts) => sum + (ts.frais_transport || 0), 0);
   const totalAutres = sorted.reduce((sum, ts) => sum + (ts.frais_autres || 0), 0);
-  const totalFrais = totalRepas + totalTransport + totalAutres;
+  const totalIK = sorted.reduce((sum, ts) => sum + (ts.ik_amount || 0), 0);
+  const totalFrais = totalRepas + totalTransport + totalAutres + totalIK;
 
   const periodLabel = invoice.month && invoice.year
     ? `${MOIS_FR[invoice.month - 1]} ${invoice.year}`
@@ -55,7 +56,8 @@ export const generateCESUTemplate = (
   const tdBase = 'padding: 7px 8px; border: 1px solid #ddd; color: #000;';
   const timesheetsHTML = sorted.map(ts => {
     const salaire = ts.duration * hourlyRate;
-    const fraisJour = (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0);
+    const ikJour = ts.ik_amount || 0;
+    const fraisJour = (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + ikJour;
     return `
     <tr>
       <td style="${tdBase}">${formatDate(ts.date_arrival)}</td>
@@ -63,6 +65,7 @@ export const generateCESUTemplate = (
       <td style="${tdBase} text-align: center;">${formatTime(ts.date_departure)}</td>
       <td style="${tdBase} text-align: right;">${ts.duration.toFixed(2)}h</td>
       <td style="${tdBase} text-align: right;">${salaire.toFixed(2)}€</td>
+      <td style="${tdBase} text-align: right;">${ikJour > 0 ? ikJour.toFixed(2) + '€' : '-'}</td>
       <td style="${tdBase} text-align: right;">${(ts.frais_repas || 0) > 0 ? (ts.frais_repas || 0).toFixed(2) + '€' : '-'}</td>
       <td style="${tdBase} text-align: right;">${(ts.frais_transport || 0) > 0 ? (ts.frais_transport || 0).toFixed(2) + '€' : '-'}</td>
       <td style="${tdBase} text-align: right;">${(ts.frais_autres || 0) > 0 ? (ts.frais_autres || 0).toFixed(2) + '€' : '-'}</td>
@@ -156,6 +159,7 @@ export const generateCESUTemplate = (
         <th style="text-align:center;">Départ</th>
         <th style="text-align:right;">Heures</th>
         <th style="text-align:right;">Salaire</th>
+        <th style="text-align:right;">IK</th>
         <th style="text-align:right;">Repas</th>
         <th style="text-align:right;">Transport</th>
         <th style="text-align:right;">Autres</th>
@@ -168,6 +172,7 @@ export const generateCESUTemplate = (
         <td colspan="3">TOTAUX DU MOIS</td>
         <td style="text-align:right;">${totalHours.toFixed(2)}h</td>
         <td style="text-align:right;">${totalSalaire.toFixed(2)}€</td>
+        <td style="text-align:right;">${totalIK > 0 ? totalIK.toFixed(2) + '€' : '-'}</td>
         <td style="text-align:right;">${totalRepas > 0 ? totalRepas.toFixed(2) + '€' : '-'}</td>
         <td style="text-align:right;">${totalTransport > 0 ? totalTransport.toFixed(2) + '€' : '-'}</td>
         <td style="text-align:right;">${totalAutres > 0 ? totalAutres.toFixed(2) + '€' : '-'}</td>
@@ -227,7 +232,7 @@ export const generateClassicalTemplate = (
   const hourlyRate = client.hourly_rate;
   const totalHours = timesheets.reduce((sum, ts) => sum + ts.duration, 0);
   const totalFrais = timesheets.reduce(
-    (sum, ts) => sum + (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0),
+    (sum, ts) => sum + (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + (ts.ik_amount || 0),
     0
   );
 
@@ -244,9 +249,10 @@ export const generateClassicalTemplate = (
   `).join('');
 
   const fraisHTML = timesheets.filter(ts =>
-    (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) > 0
+    (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + (ts.ik_amount || 0) > 0
   ).map(ts => {
     const items = [];
+    if (ts.ik_amount) items.push(`IK: ${ts.ik_amount.toFixed(2)}€ (${ts.ik_km || 0}km)`);
     if (ts.frais_repas) items.push(`Repas: ${ts.frais_repas.toFixed(2)}€`);
     if (ts.frais_transport) items.push(`Transport: ${ts.frais_transport.toFixed(2)}€`);
     if (ts.frais_autres) items.push(`Autres: ${ts.frais_autres.toFixed(2)}€`);
