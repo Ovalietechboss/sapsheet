@@ -3,7 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { useTimesheetStore } from '../stores/timesheetStore.supabase';
-import { useClientStore } from '../stores/clientStore.supabase';
+import { useClientStore, ClientContact } from '../stores/clientStore.supabase';
 import { useMandataireStore, Mandataire } from '../stores/mandataireStore.supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useBillingPeriodStore, BillingPeriod, ClientDocStatus } from '../stores/billingPeriodStore.supabase';
@@ -47,7 +47,7 @@ interface MandataireGroup {
 
 export default function BilansTab() {
   const { timesheets } = useTimesheetStore();
-  const { clients } = useClientStore();
+  const { clients, getContactsForClient } = useClientStore();
   const { mandataires } = useMandataireStore();
   const { user } = useAuthStore();
   const {
@@ -176,9 +176,11 @@ export default function BilansTab() {
         year: selectedYear,
       };
 
+      const clientContacts = getContactsForClient(client.id);
+
       const html = isCESU
-        ? generateCESUTemplate(invoiceData, client, cts, userProfile, row.mandataire)
-        : generateClassicalTemplate(invoiceData, client, cts, userProfile, row.mandataire);
+        ? generateCESUTemplate(invoiceData, client, cts, userProfile, row.mandataire, clientContacts)
+        : generateClassicalTemplate(invoiceData, client, cts, userProfile, row.mandataire, clientContacts);
 
       const filename = `${invoiceNumber}`;
       await generateAndSharePDF(html, filename);

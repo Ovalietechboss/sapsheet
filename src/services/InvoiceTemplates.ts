@@ -1,5 +1,5 @@
 import { Invoice } from '../stores/invoiceStore.supabase';
-import { Client } from '../stores/clientStore.supabase';
+import { Client, ClientContact } from '../stores/clientStore.supabase';
 import { Timesheet } from '../stores/timesheetStore.supabase';
 import { Mandataire } from '../stores/mandataireStore.supabase';
 
@@ -27,7 +27,8 @@ export const generateCESUTemplate = (
   client: Client,
   timesheets: Timesheet[],
   user: User,
-  mandataire?: Mandataire
+  mandataire?: Mandataire,
+  contacts?: ClientContact[]
 ): string => {
   const formatDate = (timestamp: number) =>
     new Date(timestamp).toLocaleDateString('fr-FR');
@@ -139,6 +140,10 @@ export const generateCESUTemplate = (
         <p style="font-size:11px;color:#000;">${mandataire.email}</p>
         ${mandataire.siren ? `<p style="font-size:11px;color:#000;">SIREN: ${mandataire.siren}</p>` : ''}
       ` : ''}
+      ${contacts && contacts.length > 0 ? `
+        <p style="margin-top:6px;"><strong>Copie à :</strong></p>
+        ${contacts.map(c => `<p style="font-size:11px;color:#000;">${c.label} — ${c.email}</p>`).join('')}
+      ` : ''}
     </div>
   </div>
 
@@ -210,7 +215,8 @@ export const generateClassicalTemplate = (
   client: Client,
   timesheets: Timesheet[],
   user: User,
-  mandataire?: Mandataire
+  mandataire?: Mandataire,
+  contacts?: ClientContact[]
 ): string => {
   const formatDate = (timestamp: number) =>
     new Date(timestamp).toLocaleDateString('fr-FR');
@@ -364,6 +370,10 @@ export const generateClassicalTemplate = (
             <p style="color:#000;">${mandataire.association_name}</p>
             <p>${mandataire.email}</p>
             ${mandataire.siren ? `<p><strong>SIREN:</strong> ${mandataire.siren}</p>` : ''}
+          ` : ''}
+          ${contacts && contacts.length > 0 ? `
+            <p style="margin-top: 8px;"><strong>Copie à :</strong></p>
+            ${contacts.map(c => `<p style="color:#000;">${c.label} — ${c.email}</p>`).join('')}
           ` : ''}
         </div>
       </div>
