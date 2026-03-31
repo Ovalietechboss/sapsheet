@@ -375,7 +375,14 @@ export default function BilansTab() {
             {group.clients.map((row) => (
               <div key={row.clientId} style={{ padding: '14px 16px', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', opacity: row.timesheetCount === 0 ? 0.45 : 1 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{row.clientName}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{row.clientName}</span>
+                    {row.mandataire && (
+                      <span style={{ fontSize: '11px', color: '#1a6fb5', backgroundColor: '#E8F4FF', padding: '1px 8px', borderRadius: '10px' }}>
+                        {row.mandataire.titre ? row.mandataire.titre + ' ' : ''}{row.mandataire.first_name ? row.mandataire.first_name + ' ' : ''}{row.mandataire.name} — {row.mandataire.association_name}
+                      </span>
+                    )}
+                  </div>
                   <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
                     {row.timesheetCount === 0
                       ? 'Aucun pointage ce mois'
