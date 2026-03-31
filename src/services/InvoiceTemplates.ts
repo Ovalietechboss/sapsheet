@@ -51,20 +51,21 @@ export const generateCESUTemplate = (
     ? `${MOIS_FR[invoice.month - 1]} ${invoice.year}`
     : formatDate(invoice.created_at);
 
+  const tdBase = 'padding: 7px 8px; border: 1px solid #ddd; color: #000;';
   const timesheetsHTML = sorted.map(ts => {
     const salaire = ts.duration * hourlyRate;
     const fraisJour = (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0);
     return `
     <tr>
-      <td style="padding: 7px 8px; border: 1px solid #ddd;">${formatDate(ts.date_arrival)}</td>
-      <td style="padding: 7px 8px; border: 1px solid #ddd; text-align: center;">${formatTime(ts.date_arrival)}</td>
-      <td style="padding: 7px 8px; border: 1px solid #ddd; text-align: center;">${formatTime(ts.date_departure)}</td>
-      <td style="padding: 7px 8px; border: 1px solid #ddd; text-align: right;">${ts.duration.toFixed(2)}h</td>
-      <td style="padding: 7px 8px; border: 1px solid #ddd; text-align: right;">${salaire.toFixed(2)}€</td>
-      <td style="padding: 7px 8px; border: 1px solid #ddd; text-align: right;">${(ts.frais_repas || 0) > 0 ? (ts.frais_repas || 0).toFixed(2) + '€' : '-'}</td>
-      <td style="padding: 7px 8px; border: 1px solid #ddd; text-align: right;">${(ts.frais_transport || 0) > 0 ? (ts.frais_transport || 0).toFixed(2) + '€' : '-'}</td>
-      <td style="padding: 7px 8px; border: 1px solid #ddd; text-align: right;">${(ts.frais_autres || 0) > 0 ? (ts.frais_autres || 0).toFixed(2) + '€' : '-'}</td>
-      <td style="padding: 7px 8px; border: 1px solid #ddd; text-align: right; font-weight: bold;">${(salaire + fraisJour).toFixed(2)}€</td>
+      <td style="${tdBase}">${formatDate(ts.date_arrival)}</td>
+      <td style="${tdBase} text-align: center;">${formatTime(ts.date_arrival)}</td>
+      <td style="${tdBase} text-align: center;">${formatTime(ts.date_departure)}</td>
+      <td style="${tdBase} text-align: right;">${ts.duration.toFixed(2)}h</td>
+      <td style="${tdBase} text-align: right;">${salaire.toFixed(2)}€</td>
+      <td style="${tdBase} text-align: right;">${(ts.frais_repas || 0) > 0 ? (ts.frais_repas || 0).toFixed(2) + '€' : '-'}</td>
+      <td style="${tdBase} text-align: right;">${(ts.frais_transport || 0) > 0 ? (ts.frais_transport || 0).toFixed(2) + '€' : '-'}</td>
+      <td style="${tdBase} text-align: right;">${(ts.frais_autres || 0) > 0 ? (ts.frais_autres || 0).toFixed(2) + '€' : '-'}</td>
+      <td style="${tdBase} text-align: right; font-weight: bold;">${(salaire + fraisJour).toFixed(2)}€</td>
     </tr>
   `}).join('');
 
@@ -74,7 +75,8 @@ export const generateCESUTemplate = (
   <meta charset="UTF-8">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; font-size: 12px; color: #333; padding: 30px; }
+    body { font-family: Arial, sans-serif; font-size: 12px; color: #000; padding: 30px; }
+    p, span, td, div { color: #000; }
     .header { border-bottom: 3px solid #34C759; padding-bottom: 16px; margin-bottom: 20px; overflow: hidden; }
     .header-left { float: left; width: 65%; }
     .header-left .badge { display: inline-block; background: #34C759; color: white; padding: 4px 12px; border-radius: 4px; font-weight: bold; font-size: 11px; margin-bottom: 6px; }
@@ -86,7 +88,7 @@ export const generateCESUTemplate = (
     .info-box { width: 48%; float: left; margin-right: 2%; padding: 12px; background: #f9f9f9; border-radius: 4px; border-left: 3px solid #34C759; }
     .info-box:last-child { margin-right: 0; }
     .info-box h3 { font-size: 10px; text-transform: uppercase; color: #34C759; margin-bottom: 6px; letter-spacing: 0.5px; }
-    .info-box p { font-size: 12px; margin-bottom: 2px; color: #444; }
+    .info-box p { font-size: 12px; margin-bottom: 2px; color: #000; }
     .section-title { background: #f0f0f0; padding: 7px 10px; font-weight: bold; font-size: 12px; margin-bottom: 0; border-left: 4px solid #34C759; clear: both; }
     table { width: 100%; border-collapse: collapse; font-size: 11px; }
     th { background: #34C759; color: white; padding: 8px 6px; text-align: left; font-size: 11px; }
@@ -133,9 +135,9 @@ export const generateCESUTemplate = (
       ${mandataire ? `
         <p style="margin-top:6px;"><strong>Mandataire :</strong></p>
         <p>${[mandataire.titre, mandataire.first_name, mandataire.name].filter(Boolean).join(' ')}</p>
-        <p style="font-size:11px;color:#666;">${mandataire.association_name}</p>
-        <p style="font-size:11px;color:#666;">${mandataire.email}</p>
-        ${mandataire.siren ? `<p style="font-size:11px;color:#999;">SIREN: ${mandataire.siren}</p>` : ''}
+        <p style="font-size:11px;color:#000;">${mandataire.association_name}</p>
+        <p style="font-size:11px;color:#000;">${mandataire.email}</p>
+        ${mandataire.siren ? `<p style="font-size:11px;color:#000;">SIREN: ${mandataire.siren}</p>` : ''}
       ` : ''}
     </div>
   </div>
@@ -222,14 +224,15 @@ export const generateClassicalTemplate = (
     0
   );
 
+  const ctd = 'padding: 8px; border: 1px solid #ddd; color: #000;';
   const timesheetsHTML = timesheets.map(ts => `
     <tr>
-      <td style="padding: 8px; border: 1px solid #ddd;">${formatDate(ts.date_arrival)}</td>
-      <td style="padding: 8px; border: 1px solid #ddd;">${formatTime(ts.date_arrival)}</td>
-      <td style="padding: 8px; border: 1px solid #ddd;">${formatTime(ts.date_departure)}</td>
-      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${ts.duration.toFixed(2)}h</td>
-      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${hourlyRate.toFixed(2)}€</td>
-      <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${(ts.duration * hourlyRate).toFixed(2)}€</td>
+      <td style="${ctd}">${formatDate(ts.date_arrival)}</td>
+      <td style="${ctd}">${formatTime(ts.date_arrival)}</td>
+      <td style="${ctd}">${formatTime(ts.date_departure)}</td>
+      <td style="${ctd} text-align: right;">${ts.duration.toFixed(2)}h</td>
+      <td style="${ctd} text-align: right;">${hourlyRate.toFixed(2)}€</td>
+      <td style="${ctd} text-align: right;">${(ts.duration * hourlyRate).toFixed(2)}€</td>
     </tr>
   `).join('');
 
@@ -242,9 +245,9 @@ export const generateClassicalTemplate = (
     if (ts.frais_autres) items.push(`Autres: ${ts.frais_autres.toFixed(2)}€`);
     return `
       <tr>
-        <td style="padding: 8px; border: 1px solid #ddd;">${formatDate(ts.date_arrival)}</td>
-        <td style="padding: 8px; border: 1px solid #ddd;">${items.join(', ')}</td>
-        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${((ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0)).toFixed(2)}€</td>
+        <td style="${ctd}">${formatDate(ts.date_arrival)}</td>
+        <td style="${ctd}">${items.join(', ')}</td>
+        <td style="${ctd} text-align: right;">${((ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0)).toFixed(2)}€</td>
       </tr>
     `;
   }).join('');
@@ -258,8 +261,9 @@ export const generateClassicalTemplate = (
         body {
           font-family: Arial, sans-serif;
           padding: 40px;
-          color: #333;
+          color: #000;
         }
+        p, span, td, div, strong { color: #000; }
         .header {
           text-align: center;
           margin-bottom: 30px;
@@ -356,7 +360,7 @@ export const generateClassicalTemplate = (
           ${mandataire ? `
             <p style="margin-top: 10px;"><strong>Mandataire :</strong></p>
             <p>${[mandataire.titre, mandataire.first_name, mandataire.name].filter(Boolean).join(' ')}</p>
-            <p style="color:#666;">${mandataire.association_name}</p>
+            <p style="color:#000;">${mandataire.association_name}</p>
             <p>${mandataire.email}</p>
             ${mandataire.siren ? `<p><strong>SIREN:</strong> ${mandataire.siren}</p>` : ''}
           ` : ''}
@@ -379,10 +383,10 @@ export const generateClassicalTemplate = (
           <tbody>
             ${timesheetsHTML}
             <tr class="total-row">
-              <td colspan="3" style="padding: 12px; border: 1px solid #ddd;">TOTAL HEURES</td>
-              <td style="padding: 12px; border: 1px solid #ddd; text-align: right;">${totalHours.toFixed(2)}h</td>
-              <td style="padding: 12px; border: 1px solid #ddd;"></td>
-              <td style="padding: 12px; border: 1px solid #ddd; text-align: right;">${(totalHours * hourlyRate).toFixed(2)}€</td>
+              <td colspan="3" style="${ctd} font-weight: bold;">TOTAL HEURES</td>
+              <td style="${ctd} text-align: right; font-weight: bold;">${totalHours.toFixed(2)}h</td>
+              <td style="${ctd}"></td>
+              <td style="${ctd} text-align: right; font-weight: bold;">${(totalHours * hourlyRate).toFixed(2)}€</td>
             </tr>
           </tbody>
         </table>
