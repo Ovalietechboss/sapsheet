@@ -63,6 +63,7 @@ export default function BilansTab() {
   const [showHistory, setShowHistory] = useState(false);
   const [confirmLock, setConfirmLock] = useState(false);
   const [subView, setSubView] = useState<SubView>('documents');
+  const [showNova, setShowNova] = useState(false);
 
   const years = Array.from({ length: 5 }, (_, i) => currentDate.getFullYear() - 3 + i).reverse();
 
@@ -256,6 +257,29 @@ export default function BilansTab() {
 
   const navigateToPeriod = (p: BillingPeriod) => { setSelectedMonth(p.month); setSelectedYear(p.year); setShowHistory(false); };
 
+  // ── Données NOVA (trimestriel) ─────────────────────────────────────────
+  const novaData = useMemo(() => {
+    // Déterminer le trimestre du mois sélectionné
+    const quarter = Math.floor((selectedMonth - 1) / 3); // 0=T1, 1=T2, 2=T3, 3=T4
+    const monthsInQuarter = [quarter * 3 + 1, quarter * 3 + 2, quarter * 3 + 3];
+    const quarterLabel = `T${quarter + 1} ${selectedYear}`;
+
+    const months = monthsInQuarter.map((m) => {
+      const s = new Date(selectedYear, m - 1, 1).getTime();
+      const e = new Date(selectedYear, m, 0, 23, 59, 59).getTime();
+      const mTs = timesheets.filter((ts) => ts.date_arrival >= s && ts.date_arrival <= e);
+      const hours = mTs.reduce((sum, ts) => sum + ts.duration, 0);
+      const distinctClients = new Set(mTs.map((ts) => ts.client_id)).size;
+      return {
+        label: MONTHS[m - 1],
+        hours: Math.ceil(hours), // arrondi supérieur pour NOVA
+        clients: distinctClients,
+      };
+    });
+
+    return { quarterLabel, months, monthsInQuarter };
+  }, [timesheets, selectedMonth, selectedYear]);
+
   const formatDate = (ts: number) => new Date(ts).toLocaleDateString('fr-FR');
   const formatTime = (ts: number) => new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
@@ -365,6 +389,10 @@ export default function BilansTab() {
           </button>
         ))}
         <div style={{ flex: 1 }} />
+        <button onClick={() => setShowNova(true)}
+          style={{ padding: '8px 16px', backgroundColor: '#AF52DE', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', alignSelf: 'center', marginBottom: '4px', marginRight: '8px' }}>
+          NOVA
+        </button>
         <button onClick={exportToCSV} disabled={monthTimesheets.length === 0}
           style={{ padding: '8px 16px', backgroundColor: monthTimesheets.length === 0 ? '#ccc' : '#34C759', color: 'white', border: 'none', borderRadius: '6px', cursor: monthTimesheets.length === 0 ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '13px', alignSelf: 'center', marginBottom: '4px' }}>
           Export CSV
@@ -509,6 +537,82 @@ export default function BilansTab() {
               <button onClick={handleLock} disabled={locking} style={{ flex: 1, padding: '12px', background: locking ? '#ccc' : '#FF9500', color: 'white', border: 'none', borderRadius: '8px', cursor: locking ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>
                 {locking ? 'Clôture...' : 'Confirmer'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════ MODAL NOVA ══════ */}
+      {showNova && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }} onClick={() => setShowNova(false)}>
+          <div style={{ background: 'white', padding: '32px', borderRadius: '12px', width: '92%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '20px' }}>Déclaration NOVA</h2>
+                <p style={{ margin: '4px 0 0', color: '#888', fontSize: '13px' }}>{novaData.quarterLabel} — Mode prestataire</p>
+              </div>
+              <span style={{ padding: '4px 12px', backgroundColor: '#AF52DE22', color: '#AF52DE', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold', border: '1px solid #AF52DE44' }}>EMA</span>
+            </div>
+
+            <p style={{ color: '#666', fontSize: '13px', marginBottom: '16px', lineHeight: '1.5' }}>
+              Recopiez ces valeurs dans votre espace <strong>NOVA</strong> → Mes statistiques → Mes données d'activité → À saisir.
+            </p>
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f5f5f5' }}>
+                  <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: '12px', color: '#888', borderBottom: '2px solid #ddd' }}></th>
+                  {novaData.months.map((m) => (
+                    <th key={m.label} style={{ padding: '10px 12px', textAlign: 'center', fontSize: '13px', fontWeight: 'bold', color: '#333', borderBottom: '2px solid #ddd' }}>{m.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style={{ padding: '10px 12px', fontWeight: '600', fontSize: '13px', borderBottom: '1px solid #eee' }}>Intervenants</td>
+                  {novaData.months.map((m) => (
+                    <td key={m.label} style={{ padding: '10px 12px', textAlign: 'center', fontSize: '16px', fontWeight: 'bold', color: '#333', borderBottom: '1px solid #eee' }}>1</td>
+                  ))}
+                </tr>
+                <tr>
+                  <td style={{ padding: '10px 12px', fontWeight: '600', fontSize: '13px', borderBottom: '1px solid #eee' }}>Dont salarié</td>
+                  {novaData.months.map((m) => (
+                    <td key={m.label} style={{ padding: '10px 12px', textAlign: 'center', fontSize: '16px', fontWeight: 'bold', color: '#888', borderBottom: '1px solid #eee' }}>0</td>
+                  ))}
+                </tr>
+                <tr style={{ backgroundColor: '#F0EBFF' }}>
+                  <td style={{ padding: '10px 12px', fontWeight: '600', fontSize: '13px', borderBottom: '1px solid #eee' }}>Heures</td>
+                  {novaData.months.map((m) => (
+                    <td key={m.label} style={{ padding: '10px 12px', textAlign: 'center', fontSize: '18px', fontWeight: 'bold', color: '#5b3db5', borderBottom: '1px solid #eee' }}>{m.hours}</td>
+                  ))}
+                </tr>
+                <tr style={{ backgroundColor: '#E8F4FF' }}>
+                  <td style={{ padding: '10px 12px', fontWeight: '600', fontSize: '13px', borderBottom: '1px solid #eee' }}>Particuliers</td>
+                  {novaData.months.map((m) => (
+                    <td key={m.label} style={{ padding: '10px 12px', textAlign: 'center', fontSize: '18px', fontWeight: 'bold', color: '#1a6fb5', borderBottom: '1px solid #eee' }}>{m.clients}</td>
+                  ))}
+                </tr>
+                <tr>
+                  <td style={{ padding: '10px 12px', fontWeight: '600', fontSize: '13px' }}>Masse salariale</td>
+                  {novaData.months.map((m) => (
+                    <td key={m.label} style={{ padding: '10px 12px', textAlign: 'center', fontSize: '16px', fontWeight: 'bold', color: '#888' }}>0</td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+
+            <div style={{ background: '#FFF8E7', border: '1px solid #FFCC00', borderRadius: '8px', padding: '10px 14px', marginBottom: '20px', fontSize: '12px', color: '#856400' }}>
+              Les heures sont arrondies à l'entier supérieur comme demandé par NOVA.
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setShowNova(false)} style={{ flex: 1, padding: '12px', background: '#f5f5f5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                Fermer
+              </button>
+              <a href="https://nova.entreprises.gouv.fr/" target="_blank" rel="noopener noreferrer"
+                style={{ flex: 1, padding: '12px', background: '#AF52DE', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', textAlign: 'center', textDecoration: 'none', display: 'block' }}>
+                Ouvrir NOVA
+              </a>
             </div>
           </div>
         </div>
