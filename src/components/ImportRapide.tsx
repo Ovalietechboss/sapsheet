@@ -103,12 +103,13 @@ export default function ImportRapide({ onClose }: Props) {
               notes: row.notes || undefined,
             });
             created++;
-          } catch {
+          } catch (err: any) {
+            console.error('[ImportRapide] Erreur pointage:', err?.message || err);
             errors++;
           }
         }
       }
-      setResult(`${created} pointage${created > 1 ? 's' : ''} créé${created > 1 ? 's' : ''}${errors > 0 ? ` (${errors} erreur${errors > 1 ? 's' : ''})` : ''}`);
+      setResult(`${created} pointage${created > 1 ? 's' : ''} créé${created > 1 ? 's' : ''}${errors > 0 ? ` (${errors} erreur${errors > 1 ? 's' : ''} — vérifiez la console F12)` : ''}`);
     } finally {
       setSaving(false);
     }
