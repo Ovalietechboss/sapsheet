@@ -402,7 +402,6 @@ export const generateClassicalTemplate = (
     <h2>Conditions</h2>
     <p><strong>Conditions de règlement :</strong> À réception</p>
     <p><strong>Mode de règlement :</strong> Virement bancaire</p>
-    <p class="notes"><strong>Notes :</strong></p>
     <p class="notes">En votre aimable règlement par virement :</p>
     ${user.iban ? `<p class="notes">IBAN : ${user.iban}</p>` : ''}
     ${user.bic ? `<p class="notes">BIC : ${user.bic}</p>` : ''}
