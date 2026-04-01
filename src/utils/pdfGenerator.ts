@@ -24,7 +24,7 @@ export async function generateAndSharePDF(htmlContent: string, filename: string)
     await new Promise((r) => setTimeout(r, 100));
 
     const canvas = await html2canvas(container, {
-      scale: 2,
+      scale: 1.5,
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
@@ -44,11 +44,13 @@ export async function generateAndSharePDF(htmlContent: string, filename: string)
     const imgH = (canvas.height * imgW) / canvas.width;
 
     // Si ça dépasse d'au max 15% → réduire pour tout mettre sur une page
+    const imgData = canvas.toDataURL('image/jpeg', 0.85);
+
     if (imgH <= printH * 1.15) {
       const finalH = Math.min(imgH, printH);
       const finalW = imgH <= printH ? imgW : (canvas.width * finalH) / canvas.height;
       const offsetX = imgH <= printH ? MARGIN : MARGIN + (printW - finalW) / 2;
-      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', offsetX, MARGIN, finalW, finalH);
+      pdf.addImage(imgData, 'JPEG', offsetX, MARGIN, finalW, finalH);
     } else {
       // Vrai multi-page : découper en tranches propres
       const pxPerPage = Math.floor((printH / imgH) * canvas.height);
@@ -69,7 +71,7 @@ export async function generateAndSharePDF(htmlContent: string, filename: string)
         ctx.drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
 
         const sliceImgH = (srcH * imgW) / canvas.width;
-        pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', MARGIN, MARGIN, imgW, sliceImgH);
+        pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.85), 'JPEG', MARGIN, MARGIN, imgW, sliceImgH);
       }
     }
 
