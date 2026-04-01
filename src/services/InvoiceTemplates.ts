@@ -317,7 +317,8 @@ export const generateClassicalTemplate = (
     .info-table { width: 100%; font-size: 12px; }
     .info-table td { padding: 3px 8px; vertical-align: top; color: #000; }
     .info-table .label { color: #888; font-size: 11px; width: 120px; }
-    .mandataire-box { margin-top: 10px; padding: 8px; background: #f7f7f7; border-radius: 4px; font-size: 12px; }
+    .mandataire-box { margin-top: 10px; padding: 8px; background: #f0f0f0; border-radius: 4px; font-size: 12px; color: #000; }
+    .mandataire-box strong, .mandataire-box span, .mandataire-box br + * { color: #000; }
     table.detail { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
     table.detail th { background: #f5f5f5; color: #555; font-weight: 600; padding: 10px 12px; text-align: left; font-size: 12px; border-bottom: 2px solid #ddd; }
     .total-line { overflow: hidden; margin-top: 6px; margin-bottom: 20px; }
@@ -353,9 +354,9 @@ export const generateClassicalTemplate = (
       </table>
       ${mandataire ? `
         <div class="mandataire-box">
-          <strong>${mandataire.association_name}</strong>
-          ${mandataireFullName ? `<br/>${mandataireFullName}` : ''}
-          ${mandataire.email ? `<br/>${mandataire.email}` : ''}
+          <span style="color:#000;font-weight:bold;">${mandataire.association_name}</span><br/>
+          ${mandataireFullName ? `<span style="color:#000;">${mandataireFullName}</span><br/>` : ''}
+          ${mandataire.email ? `<span style="color:#000;">${mandataire.email}</span>` : ''}
         </div>
       ` : ''}
     </div>
