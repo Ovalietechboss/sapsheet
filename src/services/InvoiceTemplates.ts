@@ -176,7 +176,7 @@ export const generateCESUTemplate = (
         <td style="text-align:right;">${totalRepas > 0 ? totalRepas.toFixed(2) + '€' : '-'}</td>
         <td style="text-align:right;">${totalTransport > 0 ? totalTransport.toFixed(2) + '€' : '-'}</td>
         <td style="text-align:right;">${totalAutres > 0 ? totalAutres.toFixed(2) + '€' : '-'}</td>
-        <td style="text-align:right;">${invoice.total_amount.toFixed(2)}€</td>
+        <td style="text-align:right;">${(Math.round((totalSalaire + totalFrais) * 100) / 100).toFixed(2)}€</td>
       </tr>
     </tbody>
   </table>
@@ -202,7 +202,7 @@ export const generateCESUTemplate = (
 
   <div class="total-box">
     <span class="label">MONTANT TOTAL À PERCEVOIR — ${periodLabel}</span>
-    <span class="amount">${invoice.total_amount.toFixed(2)} €</span>
+    <span class="amount">${(Math.round((totalSalaire + totalFrais) * 100) / 100).toFixed(2)} €</span>
   </div>
 
   <div class="footer">
@@ -231,10 +231,10 @@ export const generateClassicalTemplate = (
 
   const hourlyRate = client.hourly_rate;
   const totalHours = timesheets.reduce((sum, ts) => sum + ts.duration, 0);
-  const totalFrais = timesheets.reduce(
-    (sum, ts) => sum + (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + (ts.ik_amount || 0),
+  const totalFrais = Math.round(timesheets.reduce(
+    (sum, ts) => sum + Math.round(((ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + (ts.ik_amount || 0)) * 100) / 100,
     0
-  );
+  ) * 100) / 100;
 
   // Grouper les timesheets par description de prestation
   const sorted = [...timesheets].sort((a, b) => a.date_arrival - b.date_arrival);
@@ -283,9 +283,9 @@ export const generateClassicalTemplate = (
     </tr>` : '';
 
   // Ligne autres frais (repas, transport, autres) regroupés
-  const totalOtherFrais = timesheets.reduce(
-    (s, ts) => s + (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0), 0
-  );
+  const totalOtherFrais = Math.round(timesheets.reduce(
+    (s, ts) => s + Math.round(((ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0)) * 100) / 100, 0
+  ) * 100) / 100;
   const otherFraisHTML = totalOtherFrais > 0 ? `
     <tr>
       <td style="${td}">Frais</td>
@@ -394,7 +394,7 @@ export const generateClassicalTemplate = (
     <div class="total-tva">TVA non applicable, art. 293 B du CGI</div>
     <div class="total-amount">
       <span class="label">Total</span>
-      <span class="value">${(timesheets.reduce((s, ts) => s + Math.round(ts.duration * hourlyRate * 100) / 100, 0) + totalFrais).toFixed(2)} €</span>
+      <span class="value">${(Math.round((timesheets.reduce((s, ts) => s + Math.round(ts.duration * hourlyRate * 100) / 100, 0) + totalFrais) * 100) / 100).toFixed(2)} €</span>
     </div>
   </div>
 
