@@ -80,17 +80,18 @@ export default function TimesheetsTab() {
 
     if (duration <= 0) { alert('L\'heure de départ doit être après l\'heure d\'arrivée'); return; }
 
+    const pos = (v: any) => Math.max(0, parseFloat(String(v)) || 0);
     const data = {
       client_id: formData.client_id,
       date_arrival: arrival,
       date_departure: departure,
-      duration,
-      frais_repas: parseFloat(formData.frais_repas.toString()) || 0,
-      frais_transport: parseFloat(formData.frais_transport.toString()) || 0,
-      frais_autres: parseFloat(formData.frais_autres.toString()) || 0,
-      ik_km: parseFloat(formData.ik_km.toString()) || 0,
-      ik_rate: parseFloat(formData.ik_rate.toString()) || 0,
-      ik_amount: parseFloat(formData.ik_amount.toString()) || 0,
+      duration: Math.round(duration * 100) / 100,
+      frais_repas: pos(formData.frais_repas),
+      frais_transport: pos(formData.frais_transport),
+      frais_autres: pos(formData.frais_autres),
+      ik_km: pos(formData.ik_km),
+      ik_rate: pos(formData.ik_rate),
+      ik_amount: pos(formData.ik_amount),
       description: formData.description || undefined,
       notes: formData.notes,
     };

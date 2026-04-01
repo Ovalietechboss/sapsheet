@@ -46,7 +46,7 @@ export const generateCESUTemplate = (
   const totalRepas = sorted.reduce((sum, ts) => sum + (ts.frais_repas || 0), 0);
   const totalTransport = sorted.reduce((sum, ts) => sum + (ts.frais_transport || 0), 0);
   const totalAutres = sorted.reduce((sum, ts) => sum + (ts.frais_autres || 0), 0);
-  const totalIK = sorted.reduce((sum, ts) => sum + (ts.ik_amount || 0), 0);
+  const totalIK = sorted.reduce((sum, ts) => sum + (Math.max(0, ts.ik_amount || 0)), 0);
   const totalFrais = totalRepas + totalTransport + totalAutres + totalIK;
 
   const periodLabel = invoice.month && invoice.year
@@ -232,7 +232,7 @@ export const generateClassicalTemplate = (
   const hourlyRate = client.hourly_rate;
   const totalHours = timesheets.reduce((sum, ts) => sum + ts.duration, 0);
   const totalFrais = Math.round(timesheets.reduce(
-    (sum, ts) => sum + Math.round(((ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + (ts.ik_amount || 0)) * 100) / 100,
+    (sum, ts) => sum + Math.round(((ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + (Math.max(0, ts.ik_amount || 0))) * 100) / 100,
     0
   ) * 100) / 100;
 
@@ -246,8 +246,8 @@ export const generateClassicalTemplate = (
   });
 
   // Total IK
-  const totalIK = timesheets.reduce((s, ts) => s + (ts.ik_amount || 0), 0);
-  const totalIKcount = timesheets.filter((ts) => (ts.ik_amount || 0) > 0).length;
+  const totalIK = timesheets.reduce((s, ts) => s + (Math.max(0, ts.ik_amount || 0)), 0);
+  const totalIKcount = timesheets.filter((ts) => (Math.max(0, ts.ik_amount || 0)) > 0).length;
 
   const td = 'padding: 10px 12px; border-bottom: 1px solid #eee; color: #000; vertical-align: top;';
 

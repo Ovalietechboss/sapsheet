@@ -86,7 +86,7 @@ export default function BilansTab() {
       const totalHours = cts.reduce((s, ts) => s + ts.duration, 0);
       const totalEarnings = cts.reduce((s, ts) => s + Math.round(ts.duration * client.hourly_rate * 100) / 100, 0);
       const totalFrais = cts.reduce(
-        (s, ts) => s + (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + (ts.ik_amount || 0), 0
+        (s, ts) => s + (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + (Math.max(0, ts.ik_amount || 0)), 0
       );
       const mandataire = mandataires.find((m) => m.id === client.mandataire_id);
       const persisted = currentPeriod ? getClientStatus(currentPeriod.id, client.id) : null;
@@ -204,14 +204,14 @@ export default function BilansTab() {
       const client = clients.find((c) => c.id === ts.client_id);
       const rate = client?.hourly_rate || 0;
       const earnings = ts.duration * rate;
-      const frais = (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + (ts.ik_amount || 0);
+      const frais = (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + (Math.max(0, ts.ik_amount || 0));
       return [
         new Date(ts.date_arrival).toLocaleDateString('fr-FR'),
         client ? [client.titre, client.first_name, client.name].filter(Boolean).join(' ') : '',
         new Date(ts.date_arrival).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
         new Date(ts.date_departure).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
         ts.duration.toFixed(2), rate.toFixed(2), earnings.toFixed(2),
-        (ts.ik_amount || 0).toFixed(2),
+        (Math.max(0, ts.ik_amount || 0)).toFixed(2),
         (ts.frais_repas || 0).toFixed(2), (ts.frais_transport || 0).toFixed(2), (ts.frais_autres || 0).toFixed(2),
         (earnings + frais).toFixed(2),
       ].join(';');
@@ -455,7 +455,7 @@ export default function BilansTab() {
             const client = clients.find((c) => c.id === ts.client_id);
             const rate = client?.hourly_rate || 0;
             const earnings = ts.duration * rate;
-            const frais = (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + (ts.ik_amount || 0);
+            const frais = (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + (Math.max(0, ts.ik_amount || 0));
             const isCESU = client?.facturation_mode === 'CESU';
             const color = isCESU ? '#34C759' : '#007AFF';
             return (
