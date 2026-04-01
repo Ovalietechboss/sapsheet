@@ -84,7 +84,7 @@ export default function BilansTab() {
     const rows: ClientRow[] = clients.map((client) => {
       const cts = monthTimesheets.filter((ts) => ts.client_id === client.id);
       const totalHours = cts.reduce((s, ts) => s + ts.duration, 0);
-      const totalEarnings = totalHours * client.hourly_rate;
+      const totalEarnings = cts.reduce((s, ts) => s + Math.round(ts.duration * client.hourly_rate * 100) / 100, 0);
       const totalFrais = cts.reduce(
         (s, ts) => s + (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + (ts.ik_amount || 0), 0
       );

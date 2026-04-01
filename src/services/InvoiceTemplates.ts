@@ -42,7 +42,7 @@ export const generateCESUTemplate = (
   const sorted = [...timesheets].sort((a, b) => a.date_arrival - b.date_arrival);
 
   const totalHours = sorted.reduce((sum, ts) => sum + ts.duration, 0);
-  const totalSalaire = totalHours * hourlyRate;
+  const totalSalaire = sorted.reduce((sum, ts) => sum + Math.round(ts.duration * hourlyRate * 100) / 100, 0);
   const totalRepas = sorted.reduce((sum, ts) => sum + (ts.frais_repas || 0), 0);
   const totalTransport = sorted.reduce((sum, ts) => sum + (ts.frais_transport || 0), 0);
   const totalAutres = sorted.reduce((sum, ts) => sum + (ts.frais_autres || 0), 0);
@@ -55,7 +55,7 @@ export const generateCESUTemplate = (
 
   const tdBase = 'padding: 7px 8px; border: 1px solid #ddd; color: #000;';
   const timesheetsHTML = sorted.map(ts => {
-    const salaire = ts.duration * hourlyRate;
+    const salaire = Math.round(ts.duration * hourlyRate * 100) / 100;
     const ikJour = ts.ik_amount || 0;
     const fraisJour = (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + ikJour;
     return `
@@ -268,7 +268,7 @@ export const generateClassicalTemplate = (
         <td style="${td}"><strong>${desc}</strong><br/><span style="font-size:11px;color:#555;">${datesDetail}</span></td>
         <td style="${td} text-align: right;">${hourlyRate.toFixed(2)} €</td>
         <td style="${td} text-align: center;">${totalH.toFixed(0)}</td>
-        <td style="${td} text-align: right; font-weight: bold;">${(totalH * hourlyRate).toFixed(2)} €</td>
+        <td style="${td} text-align: right; font-weight: bold;">${tsList.reduce((s, ts) => s + Math.round(ts.duration * hourlyRate * 100) / 100, 0).toFixed(2)} €</td>
       </tr>`;
   }).join('');
 
