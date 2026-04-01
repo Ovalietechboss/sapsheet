@@ -206,7 +206,7 @@ export const generateCESUTemplate = (
   </div>
 
   <div class="footer">
-    <p>TVA non applicable, art. 293 B du CGI &nbsp;|&nbsp; Paiement via CESU (Chèque Emploi Service Universel)</p>
+    <p>Paiement via CESU (Chèque Emploi Service Universel) &amp; CESU+</p>
     ${user.iban ? `<p style="margin-top:4px;">IBAN : ${user.iban}${user.bic ? ' &nbsp;|&nbsp; BIC : ' + user.bic : ''}</p>` : ''}
     <p style="margin-top:12px; text-align:center; color:#666; font-size:9px; font-style:italic;">Généré par DomiTemps — Au service de celles et ceux qui prennent soin des autres</p>
   </div>
