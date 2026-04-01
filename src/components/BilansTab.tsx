@@ -270,10 +270,15 @@ export default function BilansTab() {
       const mTs = timesheets.filter((ts) => ts.date_arrival >= s && ts.date_arrival <= e);
       const hours = mTs.reduce((sum, ts) => sum + ts.duration, 0);
       const distinctClients = new Set(mTs.map((ts) => ts.client_id)).size;
+      const ca = mTs.reduce((sum, ts) => {
+        const client = clients.find((c) => c.id === ts.client_id);
+        return sum + Math.round(ts.duration * (client?.hourly_rate || 0) * 100) / 100;
+      }, 0);
       return {
         label: MONTHS[m - 1],
-        hours: Math.ceil(hours), // arrondi supérieur pour NOVA
+        hours: Math.ceil(hours),
         clients: distinctClients,
+        ca,
       };
     });
 
@@ -598,11 +603,17 @@ export default function BilansTab() {
                     <td key={m.label} style={{ padding: '10px 12px', textAlign: 'center', fontSize: '16px', fontWeight: 'bold', color: '#888' }}>0</td>
                   ))}
                 </tr>
+                <tr style={{ backgroundColor: '#EBF9F0', borderTop: '2px solid #34C759' }}>
+                  <td style={{ padding: '10px 12px', fontWeight: '600', fontSize: '13px', color: '#2d8a4e' }}>CA (hors frais/IK)</td>
+                  {novaData.months.map((m) => (
+                    <td key={m.label} style={{ padding: '10px 12px', textAlign: 'center', fontSize: '18px', fontWeight: 'bold', color: '#2d8a4e' }}>{m.ca.toFixed(2)}€</td>
+                  ))}
+                </tr>
               </tbody>
             </table>
 
             <div style={{ background: '#FFF8E7', border: '1px solid #FFCC00', borderRadius: '8px', padding: '10px 14px', marginBottom: '20px', fontSize: '12px', color: '#856400' }}>
-              Les heures sont arrondies à l'entier supérieur comme demandé par NOVA.
+              Les heures sont arrondies à l'entier supérieur. Le CA correspond aux heures × taux horaire (hors frais annexes, transport et IK).
             </div>
 
             <div style={{ display: 'flex', gap: '10px' }}>
