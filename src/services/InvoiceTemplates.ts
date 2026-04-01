@@ -236,214 +236,179 @@ export const generateClassicalTemplate = (
     0
   );
 
-  const ctd = 'padding: 8px; border: 1px solid #ddd; color: #000;';
-  const timesheetsHTML = timesheets.map(ts => `
-    <tr>
-      <td style="${ctd}">${formatDate(ts.date_arrival)}</td>
-      <td style="${ctd}">${formatTime(ts.date_arrival)}</td>
-      <td style="${ctd}">${formatTime(ts.date_departure)}</td>
-      <td style="${ctd} text-align: right;">${ts.duration.toFixed(2)}h</td>
-      <td style="${ctd} text-align: right;">${hourlyRate.toFixed(2)}€</td>
-      <td style="${ctd} text-align: right;">${(ts.duration * hourlyRate).toFixed(2)}€</td>
-    </tr>
-  `).join('');
+  // Grouper les timesheets par description de prestation
+  const sorted = [...timesheets].sort((a, b) => a.date_arrival - b.date_arrival);
+  const prestationMap = new Map<string, typeof sorted>();
+  sorted.forEach((ts) => {
+    const key = ts.description || 'Assistance à domicile';
+    if (!prestationMap.has(key)) prestationMap.set(key, []);
+    prestationMap.get(key)!.push(ts);
+  });
 
-  const fraisHTML = timesheets.filter(ts =>
-    (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + (ts.ik_amount || 0) > 0
-  ).map(ts => {
-    const items = [];
-    if (ts.ik_amount) items.push(`IK: ${ts.ik_amount.toFixed(2)}€ (${ts.ik_km || 0}km)`);
-    if (ts.frais_repas) items.push(`Repas: ${ts.frais_repas.toFixed(2)}€`);
-    if (ts.frais_transport) items.push(`Transport: ${ts.frais_transport.toFixed(2)}€`);
-    if (ts.frais_autres) items.push(`Autres: ${ts.frais_autres.toFixed(2)}€`);
+  // Total IK
+  const totalIK = timesheets.reduce((s, ts) => s + (ts.ik_amount || 0), 0);
+  const totalIKcount = timesheets.filter((ts) => (ts.ik_amount || 0) > 0).length;
+
+  const td = 'padding: 10px 12px; border-bottom: 1px solid #eee; color: #000; vertical-align: top;';
+
+  // Lignes de prestations groupées
+  const detailHTML = Array.from(prestationMap.entries()).map(([desc, tsList]) => {
+    const totalH = tsList.reduce((s, ts) => s + ts.duration, 0);
+    const datesDetail = tsList.map((ts) => {
+      const d = new Date(ts.date_arrival);
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const hh = ts.duration.toFixed(0);
+      const mm2 = Math.round((ts.duration % 1) * 60);
+      return `${dd}/${mm}: ${hh}h${mm2 > 0 ? String(mm2).padStart(2, '0') : '00'}`;
+    }).join('<br/>');
     return `
       <tr>
-        <td style="${ctd}">${formatDate(ts.date_arrival)}</td>
-        <td style="${ctd}">${items.join(', ')}</td>
-        <td style="${ctd} text-align: right;">${((ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0)).toFixed(2)}€</td>
-      </tr>
-    `;
+        <td style="${td}">Service</td>
+        <td style="${td}"><strong>${desc}</strong><br/><span style="font-size:11px;color:#555;">${datesDetail}</span></td>
+        <td style="${td} text-align: right;">${hourlyRate.toFixed(2)} €</td>
+        <td style="${td} text-align: center;">${totalH.toFixed(0)}</td>
+        <td style="${td} text-align: right; font-weight: bold;">${(totalH * hourlyRate).toFixed(2)} €</td>
+      </tr>`;
   }).join('');
 
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          padding: 40px;
-          color: #000;
-        }
-        p, span, td, div, strong { color: #000; }
-        .header {
-          text-align: center;
-          margin-bottom: 30px;
-          border-bottom: 3px solid #007AFF;
-          padding-bottom: 20px;
-        }
-        .badge {
-          display: inline-block;
-          background-color: #007AFF;
-          color: white;
-          padding: 8px 16px;
-          border-radius: 4px;
-          font-weight: bold;
-          font-size: 14px;
-          margin-bottom: 10px;
-        }
-        .section {
-          margin-bottom: 25px;
-        }
-        .section-title {
-          background-color: #f5f5f5;
-          padding: 10px;
-          font-weight: bold;
-          margin-bottom: 10px;
-          border-left: 4px solid #007AFF;
-        }
-        .info-grid {
-          overflow: hidden;
-          margin-bottom: 25px;
-        }
-        .info-box {
-          width: 48%;
-          float: left;
-          margin-right: 2%;
-          padding: 15px;
-          background-color: #f9f9f9;
-          border-radius: 4px;
-        }
-        .info-box:last-child {
-          margin-right: 0;
-        }
-        .info-box h3 {
-          margin-top: 0;
-          color: #007AFF;
-          font-size: 14px;
-          text-transform: uppercase;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-bottom: 20px;
-        }
-        th {
-          background-color: #007AFF;
-          color: white;
-          padding: 10px;
-          text-align: left;
-        }
-        .total-row {
-          background-color: #f5f5f5;
-          font-weight: bold;
-        }
-        .footer {
-          margin-top: 40px;
-          padding-top: 20px;
-          border-top: 2px solid #ddd;
-          font-size: 12px;
-          color: #666;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div class="badge">FACTURE</div>
-          <h1 style="margin: 10px 0;">Facture N° ${invoice.invoice_number}</h1>
-          <p style="margin: 5px 0;">Date: ${formatDate(invoice.created_at)}</p>
-      </div>
+  // Ligne IK si présent
+  const ikHTML = totalIK > 0 ? `
+    <tr>
+      <td style="${td}">Service</td>
+      <td style="${td}"><strong>Indemnités Kilométriques</strong></td>
+      <td style="${td} text-align: right;">${(totalIK / (totalIKcount || 1)).toFixed(2)} €</td>
+      <td style="${td} text-align: center;">${totalIKcount}</td>
+      <td style="${td} text-align: right; font-weight: bold;">${totalIK.toFixed(2)} €</td>
+    </tr>` : '';
 
-      <div class="info-grid">
-        <div class="info-box">
-          <h3>Prestataire</h3>
-          <p><strong>${user.businessName || user.displayName}</strong></p>
-          <p>${user.businessAddress || user.address || ''}</p>
-          ${user.siren ? `<p><strong>SIREN:</strong> ${user.siren}</p>` : ''}
-          ${user.siret ? `<p><strong>SIRET:</strong> ${user.siret}</p>` : ''}
-          <p>${user.phone || ''}</p>
-          <p>${user.email}</p>
-        </div>
-        <div class="info-box">
-          <h3>Client</h3>
-          <p><strong>${[client.titre, client.first_name, client.name].filter(Boolean).join(' ')}</strong></p>
-          <p>${client.address}</p>
-          ${client.email ? `<p>${client.email}</p>` : ''}
-          ${mandataire ? `
-            <p style="margin-top: 10px;"><strong>Mandataire :</strong></p>
-            <p>${[mandataire.titre, mandataire.first_name, mandataire.name].filter(Boolean).join(' ')}</p>
-            <p style="color:#000;">${mandataire.association_name}</p>
-            <p>${mandataire.email}</p>
-            ${mandataire.siren ? `<p><strong>SIREN:</strong> ${mandataire.siren}</p>` : ''}
-          ` : ''}
-          ${contacts && contacts.length > 0 ? `
-            <p style="margin-top: 8px;"><strong>Copie à :</strong></p>
-            ${contacts.map(c => `<p style="color:#000;">${c.label} — ${c.email}</p>`).join('')}
-          ` : ''}
-        </div>
-      </div>
+  // Ligne autres frais (repas, transport, autres) regroupés
+  const totalOtherFrais = timesheets.reduce(
+    (s, ts) => s + (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0), 0
+  );
+  const otherFraisHTML = totalOtherFrais > 0 ? `
+    <tr>
+      <td style="${td}">Frais</td>
+      <td style="${td}"><strong>Frais annexes</strong><br/><span style="font-size:11px;color:#555;">Repas, transport, autres</span></td>
+      <td style="${td} text-align: right;"></td>
+      <td style="${td} text-align: center;"></td>
+      <td style="${td} text-align: right; font-weight: bold;">${totalOtherFrais.toFixed(2)} €</td>
+    </tr>` : '';
 
-      <div class="section">
-        <div class="section-title">Détail des prestations</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Arrivée</th>
-              <th>Départ</th>
-              <th style="text-align: right;">Heures</th>
-              <th style="text-align: right;">Taux horaire</th>
-              <th style="text-align: right;">Montant</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${timesheetsHTML}
-            <tr class="total-row">
-              <td colspan="3" style="${ctd} font-weight: bold;">TOTAL HEURES</td>
-              <td style="${ctd} text-align: right; font-weight: bold;">${totalHours.toFixed(2)}h</td>
-              <td style="${ctd}"></td>
-              <td style="${ctd} text-align: right; font-weight: bold;">${(totalHours * hourlyRate).toFixed(2)}€</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+  const clientFullName = [client.titre, client.first_name, client.name].filter(Boolean).join(' ');
+  const mandataireFullName = mandataire ? [mandataire.titre, mandataire.first_name, mandataire.name].filter(Boolean).join(' ') : '';
 
-      ${totalFrais > 0 ? `
-        <div class="section">
-          <div class="section-title">Frais annexes</div>
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Description</th>
-                <th style="text-align: right;">Montant</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${fraisHTML}
-              <tr class="total-row">
-                <td colspan="2" style="padding: 12px; border: 1px solid #ddd;">TOTAL FRAIS</td>
-                <td style="padding: 12px; border: 1px solid #ddd; text-align: right;">${totalFrais.toFixed(2)}€</td>
-              </tr>
-            </tbody>
-          </table>
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 13px; color: #000; padding: 40px; }
+    p { margin: 0 0 3px; color: #000; }
+    h1 { font-size: 26px; color: #333; margin-bottom: 4px; }
+    h2 { font-size: 18px; color: #333; margin-bottom: 14px; }
+    .header { margin-bottom: 30px; }
+    .header .date { color: #666; font-size: 14px; }
+    .cols { overflow: hidden; margin-bottom: 28px; }
+    .col-left { float: left; width: 55%; }
+    .col-right { float: right; width: 40%; }
+    .col-right h2 { margin-bottom: 8px; }
+    .info-table { width: 100%; font-size: 12px; }
+    .info-table td { padding: 3px 8px; vertical-align: top; color: #000; }
+    .info-table .label { color: #888; font-size: 11px; width: 120px; }
+    .mandataire-box { margin-top: 10px; padding: 8px; background: #f7f7f7; border-radius: 4px; font-size: 12px; }
+    table.detail { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+    table.detail th { background: #f5f5f5; color: #555; font-weight: 600; padding: 10px 12px; text-align: left; font-size: 12px; border-bottom: 2px solid #ddd; }
+    .total-line { overflow: hidden; margin-top: 6px; margin-bottom: 20px; }
+    .total-tva { float: left; font-size: 11px; color: #888; line-height: 30px; }
+    .total-amount { float: right; }
+    .total-amount .label { font-size: 13px; color: #555; font-weight: bold; }
+    .total-amount .value { font-size: 22px; font-weight: bold; color: #000; margin-left: 12px; }
+    .conditions { margin-top: 24px; padding-top: 16px; border-top: 1px solid #ddd; }
+    .conditions h2 { font-size: 16px; margin-bottom: 10px; }
+    .conditions p { font-size: 12px; margin-bottom: 4px; }
+    .conditions .notes { margin-top: 8px; color: #555; }
+    .domitemps { margin-top: 20px; text-align: center; color: #666; font-size: 9px; font-style: italic; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>Facture ${invoice.invoice_number}</h1>
+    <p class="date">${formatDate(invoice.created_at)}</p>
+  </div>
+
+  <div class="cols">
+    <div class="col-left">
+      <h2>Émetteur</h2>
+      <table class="info-table">
+        ${user.businessName ? `<tr><td class="label">Société :</td><td><strong>${user.businessName}</strong></td></tr>` : ''}
+        <tr><td class="label">Votre contact :</td><td><strong>${user.displayName}</strong></td></tr>
+        <tr><td class="label">Adresse :</td><td>${user.address || ''}</td></tr>
+        ${user.siret ? `<tr><td class="label">N° entreprise :</td><td>${user.siret}</td></tr>` : ''}
+        ${user.siren ? `<tr><td class="label">SIREN :</td><td>${user.siren}</td></tr>` : ''}
+        ${user.phone ? `<tr><td class="label">Téléphone :</td><td>${user.phone}</td></tr>` : ''}
+        <tr><td class="label">Email :</td><td>${user.email}</td></tr>
+      </table>
+      ${mandataire ? `
+        <div class="mandataire-box">
+          <strong>${mandataire.association_name}</strong>
+          ${mandataireFullName ? `<br/>${mandataireFullName}` : ''}
+          ${mandataire.email ? `<br/>${mandataire.email}` : ''}
         </div>
       ` : ''}
+    </div>
+    <div class="col-right">
+      <h2>Destinataire</h2>
+      <p><strong>${clientFullName}</strong></p>
+      <p>${client.address}</p>
+      ${client.email ? `<p>${client.email}</p>` : ''}
+      ${contacts && contacts.length > 0 ? `
+        <p style="margin-top:8px;"><strong>Copie à :</strong></p>
+        ${contacts.map(c => `<p>${c.label} — ${c.email}</p>`).join('')}
+      ` : ''}
+    </div>
+  </div>
 
-      <div style="text-align: right; margin-top: 30px; padding: 20px; background-color: #007AFF; color: white; border-radius: 4px;">
-        <h2 style="margin: 0;">MONTANT TOTAL: ${invoice.total_amount.toFixed(2)}€</h2>
-      </div>
+  <h2>Détail</h2>
+  <table class="detail">
+    <thead>
+      <tr>
+        <th style="width:70px;">Type</th>
+        <th>Description</th>
+        <th style="text-align:right; width:100px;">Prix unitaire HT</th>
+        <th style="text-align:center; width:70px;">Quantité</th>
+        <th style="text-align:right; width:90px;">Total HT</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${detailHTML}
+      ${ikHTML}
+      ${otherFraisHTML}
+    </tbody>
+  </table>
 
-      <div class="footer">
-        <p><strong>Mentions légales:</strong></p>
-        <p>TVA non applicable, art. 293 B du CGI</p>
-        ${user.iban ? `<p><strong>IBAN:</strong> ${user.iban}</p>` : ''}
-        ${user.bic ? `<p><strong>BIC:</strong> ${user.bic}</p>` : ''}
-        <p style="margin-top: 15px;">Paiement à réception de facture</p>
-        <p style="margin-top:12px; text-align:center; color:#666; font-size:9px; font-style:italic;">Généré par DomiTemps — Au service de celles et ceux qui prennent soin des autres</p>
-      </div>
-    </body>
-    </html>
-  `;
+  <div class="total-line">
+    <div class="total-tva">TVA non applicable, art. 293 B du CGI</div>
+    <div class="total-amount">
+      <span class="label">Total</span>
+      <span class="value">${invoice.total_amount.toFixed(2)} €</span>
+    </div>
+  </div>
+
+  <div class="conditions">
+    <h2>Conditions</h2>
+    <p><strong>Conditions de règlement :</strong> À réception</p>
+    <p><strong>Mode de règlement :</strong> Virement bancaire</p>
+    <p class="notes"><strong>Notes :</strong></p>
+    <p class="notes">En votre aimable règlement par virement :</p>
+    ${user.iban ? `<p class="notes">IBAN : ${user.iban}</p>` : ''}
+    ${user.bic ? `<p class="notes">BIC : ${user.bic}</p>` : ''}
+  </div>
+
+  <p class="domitemps">Généré par DomiTemps — Au service de celles et ceux qui prennent soin des autres</p>
+
+</body>
+</html>`;
 };

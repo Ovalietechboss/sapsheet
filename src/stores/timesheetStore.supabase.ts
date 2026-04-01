@@ -15,6 +15,7 @@ export interface Timesheet {
   ik_km: number;
   ik_rate: number;
   ik_amount: number;
+  description?: string;
   notes?: string;
   status: 'draft' | 'validated';
   created_at: number;

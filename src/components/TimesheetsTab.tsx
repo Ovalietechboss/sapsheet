@@ -33,6 +33,7 @@ export default function TimesheetsTab() {
     ik_km: 0,
     ik_rate: DEFAULT_IK_RATE,
     ik_amount: 0,
+    description: '',
     notes: '',
   });
 
@@ -62,6 +63,7 @@ export default function TimesheetsTab() {
       ik_km: ts.ik_km || 0,
       ik_rate: ts.ik_rate || DEFAULT_IK_RATE,
       ik_amount: ts.ik_amount || 0,
+      description: ts.description || '',
       notes: ts.notes || '',
     });
     setEditingId(ts.id);
@@ -89,6 +91,7 @@ export default function TimesheetsTab() {
       ik_km: parseFloat(formData.ik_km.toString()) || 0,
       ik_rate: parseFloat(formData.ik_rate.toString()) || 0,
       ik_amount: parseFloat(formData.ik_amount.toString()) || 0,
+      description: formData.description || undefined,
       notes: formData.notes,
     };
 
@@ -148,6 +151,7 @@ export default function TimesheetsTab() {
                     {ts.status === 'validated' ? 'Validé' : 'Brouillon'}
                   </span>
                 </div>
+                {ts.description && <p style={{ color: '#333', marginBottom: '4px', fontSize: '13px', fontWeight: '500' }}>{ts.description}</p>}
                 <p style={{ color: '#666', marginBottom: '4px', fontSize: '14px' }}>
                   {formatDate(ts.date_arrival)} · {formatTime(ts.date_arrival)} → {formatTime(ts.date_departure)}
                 </p>
@@ -245,6 +249,14 @@ export default function TimesheetsTab() {
                     onChange={(e) => setFormData({ ...formData, time_departure: e.target.value })}
                     required style={inputStyle} />
                 </div>
+              </div>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={labelStyle}>Prestation réalisée</label>
+                <input type="text" value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Ex: Assistance à domicile, Accompagnement courses..."
+                  style={inputStyle} />
               </div>
 
               {/* Indemnités kilométriques */}
