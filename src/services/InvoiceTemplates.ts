@@ -258,8 +258,8 @@ export const generateClassicalTemplate = (
       const d = new Date(ts.date_arrival);
       const dd = String(d.getDate()).padStart(2, '0');
       const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const hh = ts.duration.toFixed(0);
-      const mm2 = Math.round((ts.duration % 1) * 60);
+      const hh = Math.floor(ts.duration);
+      const mm2 = Math.round((ts.duration - hh) * 60);
       return `${dd}/${mm}: ${hh}h${mm2 > 0 ? String(mm2).padStart(2, '0') : '00'}`;
     }).join('<br/>');
     return `
@@ -267,7 +267,7 @@ export const generateClassicalTemplate = (
         <td style="${td}">Service</td>
         <td style="${td}"><strong>${desc}</strong><br/><span style="font-size:11px;color:#555;">${datesDetail}</span></td>
         <td style="${td} text-align: right;">${hourlyRate.toFixed(2)} €</td>
-        <td style="${td} text-align: center;">${totalH.toFixed(0)}</td>
+        <td style="${td} text-align: center;">${totalH % 1 === 0 ? totalH.toFixed(0) : totalH.toFixed(1)}</td>
         <td style="${td} text-align: right; font-weight: bold;">${tsList.reduce((s, ts) => s + Math.round(ts.duration * hourlyRate * 100) / 100, 0).toFixed(2)} €</td>
       </tr>`;
   }).join('');
@@ -394,7 +394,7 @@ export const generateClassicalTemplate = (
     <div class="total-tva">TVA non applicable, art. 293 B du CGI</div>
     <div class="total-amount">
       <span class="label">Total</span>
-      <span class="value">${invoice.total_amount.toFixed(2)} €</span>
+      <span class="value">${(timesheets.reduce((s, ts) => s + Math.round(ts.duration * hourlyRate * 100) / 100, 0) + totalFrais).toFixed(2)} €</span>
     </div>
   </div>
 
