@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTimesheetStore, Timesheet } from '../stores/timesheetStore.supabase';
 import { useClientStore } from '../stores/clientStore.supabase';
+import ImportRapide from './ImportRapide';
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box',
@@ -12,6 +13,7 @@ export default function TimesheetsTab() {
   const { clients } = useClientStore();
 
   const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null);
+  const [showImport, setShowImport] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const todayStr = () => {
@@ -119,14 +121,22 @@ export default function TimesheetsTab() {
 
   return (
     <div>
+      {showImport ? (
+        <ImportRapide onClose={() => setShowImport(false)} />
+      ) : (
+      <>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <h2 style={{ margin: 0 }}>Pointages ({timesheets.length})</h2>
-        <button
-          onClick={openCreate}
-          style={{ padding: '10px 20px', backgroundColor: '#007AFF', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}
-        >
-          + Nouveau pointage
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={() => setShowImport(true)}
+            style={{ padding: '10px 20px', backgroundColor: '#34C759', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>
+            Saisie rapide
+          </button>
+          <button onClick={openCreate}
+            style={{ padding: '10px 20px', backgroundColor: '#007AFF', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>
+            + Nouveau
+          </button>
+        </div>
       </div>
 
       {/* Liste des pointages */}
@@ -195,6 +205,9 @@ export default function TimesheetsTab() {
           </div>
         ))}
       </div>
+
+      </>
+      )}
 
       {/* Modal création / édition */}
       {modalMode && (
