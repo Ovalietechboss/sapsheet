@@ -350,7 +350,7 @@ export const generateClassicalTemplate = (
     </head>
     <body>
       <div class="header">
-        <div class="badge">FACTURE CLASSIQUE</div>
+        <div class="badge">FACTURE</div>
           <h1 style="margin: 10px 0;">Facture N° ${invoice.invoice_number}</h1>
           <p style="margin: 5px 0;">Date: ${formatDate(invoice.created_at)}</p>
       </div>
