@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useTimesheetStore, Timesheet } from '../stores/timesheetStore.supabase';
 import { useClientStore } from '../stores/clientStore.supabase';
+import { useIsMobile } from '../hooks/useMediaQuery';
 import ImportRapide from './ImportRapide';
+
+const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const JOURS = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box',
@@ -11,7 +15,11 @@ const labelStyle: React.CSSProperties = { display: 'block', marginBottom: '6px',
 export default function TimesheetsTab() {
   const { timesheets, addTimesheet, updateTimesheet, deleteTimesheet } = useTimesheetStore();
   const { clients } = useClientStore();
+  const isMobile = useIsMobile();
 
+  const now = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
   const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -24,49 +32,64 @@ export default function TimesheetsTab() {
   const DEFAULT_IK_RATE = 0.603;
 
   const emptyForm = () => ({
-    client_id: '',
-    date_arrival: todayStr(),
-    time_arrival: '',
-    date_departure: todayStr(),
-    time_departure: '',
-    frais_repas: 0,
-    frais_transport: 0,
-    frais_autres: 0,
-    ik_km: 0,
-    ik_rate: DEFAULT_IK_RATE,
-    ik_amount: 0,
-    description: '',
-    notes: '',
+    client_id: '', date_arrival: todayStr(), time_arrival: '', date_departure: todayStr(), time_departure: '',
+    frais_repas: 0, frais_transport: 0, frais_autres: 0,
+    ik_km: 0, ik_rate: DEFAULT_IK_RATE, ik_amount: 0, description: '', notes: '',
   });
 
   const [formData, setFormData] = useState(emptyForm);
 
-  const openCreate = () => {
-    setFormData(emptyForm());
-    setEditingId(null);
-    setModalMode('create');
+  // ── Filtrer et grouper par jour ────────────────────────────────────────
+
+  const { monthTimesheets, dayGroups, totalHours, activeClients } = useMemo(() => {
+    const start = new Date(selectedYear, selectedMonth - 1, 1).getTime();
+    const end = new Date(selectedYear, selectedMonth, 0, 23, 59, 59).getTime();
+    const filtered = timesheets
+      .filter((ts) => ts.date_arrival >= start && ts.date_arrival <= end)
+      .sort((a, b) => b.date_arrival - a.date_arrival);
+
+    const totalHours = filtered.reduce((s, ts) => s + ts.duration, 0);
+    const activeClients = new Set(filtered.map((ts) => ts.client_id)).size;
+
+    // Grouper par jour
+    const groups = new Map<string, Timesheet[]>();
+    filtered.forEach((ts) => {
+      const d = new Date(ts.date_arrival);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(ts);
+    });
+
+    return { monthTimesheets: filtered, dayGroups: groups, totalHours, activeClients };
+  }, [timesheets, selectedMonth, selectedYear]);
+
+  // ── Navigation mois ────────────────────────────────────────────────────
+
+  const prevMonth = () => {
+    if (selectedMonth === 1) { setSelectedMonth(12); setSelectedYear(selectedYear - 1); }
+    else setSelectedMonth(selectedMonth - 1);
   };
+
+  const nextMonth = () => {
+    if (selectedMonth === 12) { setSelectedMonth(1); setSelectedYear(selectedYear + 1); }
+    else setSelectedMonth(selectedMonth + 1);
+  };
+
+  // ── Helpers ────────────────────────────────────────────────────────────
+
+  const openCreate = () => { setFormData(emptyForm()); setEditingId(null); setModalMode('create'); };
 
   const openEdit = (ts: Timesheet) => {
     const arrival = new Date(ts.date_arrival);
     const departure = new Date(ts.date_departure);
-    const dateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const timeStr = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-
+    const ds = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const tms = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     setFormData({
-      client_id: ts.client_id,
-      date_arrival: dateStr(arrival),
-      time_arrival: timeStr(arrival),
-      date_departure: dateStr(departure),
-      time_departure: timeStr(departure),
-      frais_repas: ts.frais_repas || 0,
-      frais_transport: ts.frais_transport || 0,
-      frais_autres: ts.frais_autres || 0,
-      ik_km: ts.ik_km || 0,
-      ik_rate: ts.ik_rate || DEFAULT_IK_RATE,
-      ik_amount: ts.ik_amount || 0,
-      description: ts.description || '',
-      notes: ts.notes || '',
+      client_id: ts.client_id, date_arrival: ds(arrival), time_arrival: tms(arrival),
+      date_departure: ds(departure), time_departure: tms(departure),
+      frais_repas: ts.frais_repas || 0, frais_transport: ts.frais_transport || 0, frais_autres: ts.frais_autres || 0,
+      ik_km: ts.ik_km || 0, ik_rate: ts.ik_rate || DEFAULT_IK_RATE, ik_amount: ts.ik_amount || 0,
+      description: ts.description || '', notes: ts.notes || '',
     });
     setEditingId(ts.id);
     setModalMode('edit');
@@ -75,40 +98,24 @@ export default function TimesheetsTab() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.client_id) { alert('Veuillez sélectionner un client'); return; }
-
     const arrival = new Date(`${formData.date_arrival}T${formData.time_arrival}`).getTime();
     const departure = new Date(`${formData.date_departure}T${formData.time_departure}`).getTime();
     const duration = (departure - arrival) / (1000 * 60 * 60);
-
     if (duration <= 0) { alert('L\'heure de départ doit être après l\'heure d\'arrivée'); return; }
-
     const pos = (v: any) => Math.max(0, parseFloat(String(v)) || 0);
     const data = {
-      client_id: formData.client_id,
-      date_arrival: arrival,
-      date_departure: departure,
+      client_id: formData.client_id, date_arrival: arrival, date_departure: departure,
       duration: Math.round(duration * 100) / 100,
-      frais_repas: pos(formData.frais_repas),
-      frais_transport: pos(formData.frais_transport),
-      frais_autres: pos(formData.frais_autres),
-      ik_km: pos(formData.ik_km),
-      ik_rate: pos(formData.ik_rate),
-      ik_amount: pos(formData.ik_amount),
-      description: formData.description || undefined,
-      notes: formData.notes,
+      frais_repas: pos(formData.frais_repas), frais_transport: pos(formData.frais_transport), frais_autres: pos(formData.frais_autres),
+      ik_km: pos(formData.ik_km), ik_rate: pos(formData.ik_rate), ik_amount: pos(formData.ik_amount),
+      description: formData.description || undefined, notes: formData.notes,
     };
-
-    if (modalMode === 'edit' && editingId) {
-      updateTimesheet(editingId, data);
-    } else {
-      addTimesheet(data);
-    }
-
+    if (modalMode === 'edit' && editingId) updateTimesheet(editingId, data);
+    else addTimesheet(data);
     setModalMode(null);
     setFormData(emptyForm());
   };
 
-  const formatDate = (timestamp: number) => new Date(timestamp).toLocaleDateString('fr-FR');
   const formatTime = (timestamp: number) => new Date(timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
   const getClientName = (clientId: string) => {
@@ -116,8 +123,12 @@ export default function TimesheetsTab() {
     return client ? [client.titre, client.first_name, client.name].filter(Boolean).join(' ') : 'Inconnu';
   };
 
-  // Trier par date décroissante
-  const sortedTimesheets = [...timesheets].sort((a, b) => b.date_arrival - a.date_arrival);
+  const formatDayLabel = (dateKey: string) => {
+    const d = new Date(dateKey + 'T12:00:00');
+    return `${JOURS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  };
+
+  // ── Rendu ──────────────────────────────────────────────────────────────
 
   return (
     <div>
@@ -125,100 +136,120 @@ export default function TimesheetsTab() {
         <ImportRapide onClose={() => setShowImport(false)} />
       ) : (
       <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h2 style={{ margin: 0 }}>Pointages ({timesheets.length})</h2>
+      {/* En-tête */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+        <h2 style={{ margin: 0 }}>Pointages</h2>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={() => setShowImport(true)}
-            style={{ padding: '10px 20px', backgroundColor: '#34C759', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>
-            Saisie rapide
-          </button>
+          {!isMobile && (
+            <button onClick={() => setShowImport(true)}
+              style={{ padding: '8px 16px', backgroundColor: '#34C759', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>
+              Saisie rapide
+            </button>
+          )}
           <button onClick={openCreate}
-            style={{ padding: '10px 20px', backgroundColor: '#007AFF', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>
+            style={{ padding: '8px 16px', backgroundColor: '#007AFF', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>
             + Nouveau
           </button>
         </div>
       </div>
 
-      {/* Liste des pointages */}
-      <div style={{ display: 'grid', gap: '12px' }}>
-        {sortedTimesheets.length === 0 ? (
-          <div style={{ textAlign: 'center', color: '#999', padding: '40px', background: '#f9f9f9', borderRadius: '10px' }}>
-            Aucun pointage. Créez votre premier !
+      {/* Navigation mois */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', background: 'white', border: '1px solid #eee', borderRadius: '10px', padding: '10px 16px' }}>
+        <button onClick={prevMonth} style={{ padding: '6px 14px', backgroundColor: '#f0f2f5', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}>◄</button>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#333' }}>{MONTHS[selectedMonth - 1]} {selectedYear}</div>
+          <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
+            {monthTimesheets.length} pointage{monthTimesheets.length !== 1 ? 's' : ''} · {totalHours.toFixed(1)}h · {activeClients} client{activeClients !== 1 ? 's' : ''}
           </div>
-        ) : sortedTimesheets.map((ts) => (
-          <div
-            key={ts.id}
-            style={{ backgroundColor: 'white', padding: '18px', borderRadius: '10px', border: '1px solid #eee', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-              <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => openEdit(ts)}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                  <h3 style={{ margin: 0, fontSize: '16px' }}>{getClientName(ts.client_id)}</h3>
-                  <span style={{
-                    padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: 'bold',
-                    backgroundColor: ts.status === 'validated' ? '#EBF9F0' : '#FFF4E5',
-                    color: ts.status === 'validated' ? '#2d8a4e' : '#b36b00',
-                  }}>
-                    {ts.status === 'validated' ? 'Validé' : 'Brouillon'}
-                  </span>
-                </div>
-                {ts.description && <p style={{ color: '#333', marginBottom: '4px', fontSize: '13px', fontWeight: '500' }}>{ts.description}</p>}
-                <p style={{ color: '#666', marginBottom: '4px', fontSize: '14px' }}>
-                  {formatDate(ts.date_arrival)} · {formatTime(ts.date_arrival)} → {formatTime(ts.date_departure)}
-                </p>
-                <p style={{ color: '#007AFF', fontWeight: 'bold', fontSize: '15px', marginBottom: '4px' }}>
-                  {ts.duration.toFixed(2)}h
-                </p>
-                {(ts.frais_repas > 0 || ts.frais_transport > 0 || ts.frais_autres > 0 || ts.ik_amount > 0) && (
-                  <div style={{ fontSize: '13px', color: '#888', marginTop: '6px' }}>
-                    {ts.ik_amount > 0 && <span>IK: {ts.ik_km}km × {ts.ik_rate}€ = {ts.ik_amount.toFixed(2)}€ </span>}
-                    {ts.frais_repas > 0 && <span>Repas: {ts.frais_repas}€ </span>}
-                    {ts.frais_transport > 0 && <span>Transport: {ts.frais_transport}€ </span>}
-                    {ts.frais_autres > 0 && <span>Autres: {ts.frais_autres}€</span>}
-                  </div>
-                )}
-                {ts.notes && <p style={{ marginTop: '6px', fontStyle: 'italic', color: '#888', fontSize: '13px' }}>{ts.notes}</p>}
-              </div>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                {ts.status !== 'validated' && (
-                  <button onClick={() => updateTimesheet(ts.id, { status: 'validated' })}
-                    style={{ padding: '7px 14px', backgroundColor: '#34C759', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
-                    Valider
-                  </button>
-                )}
-                {ts.status === 'validated' && (
-                  <button onClick={() => updateTimesheet(ts.id, { status: 'draft' })}
-                    style={{ padding: '7px 14px', backgroundColor: '#FF9500', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>
-                    Repasser brouillon
-                  </button>
-                )}
-                <button onClick={() => openEdit(ts)}
-                  style={{ padding: '7px 14px', backgroundColor: '#007AFF', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
-                  Modifier
-                </button>
-                <button onClick={() => { if (window.confirm('Supprimer ce pointage ?')) deleteTimesheet(ts.id); }}
-                  style={{ padding: '7px 14px', backgroundColor: '#ff3b30', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>
-                  Supprimer
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
+        </div>
+        <button onClick={nextMonth} style={{ padding: '6px 14px', backgroundColor: '#f0f2f5', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}>►</button>
       </div>
 
+      {/* Liste groupée par jour */}
+      {monthTimesheets.length === 0 ? (
+        <div style={{ textAlign: 'center', color: '#999', padding: '40px', background: '#f9f9f9', borderRadius: '10px' }}>
+          Aucun pointage pour {MONTHS[selectedMonth - 1]} {selectedYear}
+        </div>
+      ) : (
+        <div>
+          {Array.from(dayGroups.entries()).map(([dateKey, dayTs]) => {
+            const dayHours = dayTs.reduce((s, ts) => s + ts.duration, 0);
+            return (
+              <div key={dateKey} style={{ marginBottom: '16px' }}>
+                {/* Séparateur jour */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', backgroundColor: '#f0f2f5', borderRadius: '8px', marginBottom: '8px' }}>
+                  <span style={{ fontWeight: 'bold', fontSize: '13px', color: '#555' }}>{formatDayLabel(dateKey)}</span>
+                  <span style={{ fontSize: '13px', color: '#007AFF', fontWeight: 'bold' }}>{dayHours.toFixed(1)}h</span>
+                </div>
+                {/* Pointages du jour */}
+                <div style={{ display: 'grid', gap: '6px' }}>
+                  {dayTs.map((ts) => (
+                    <div key={ts.id} style={{ backgroundColor: 'white', padding: isMobile ? '12px' : '14px 16px', borderRadius: '8px', border: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ flex: 1, cursor: 'pointer', minWidth: '150px' }} onClick={() => openEdit(ts)}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{getClientName(ts.client_id)}</span>
+                          <span style={{
+                            padding: '1px 7px', borderRadius: '8px', fontSize: '10px', fontWeight: 'bold',
+                            backgroundColor: ts.status === 'validated' ? '#EBF9F0' : '#FFF4E5',
+                            color: ts.status === 'validated' ? '#2d8a4e' : '#b36b00',
+                          }}>
+                            {ts.status === 'validated' ? 'Validé' : 'Brouillon'}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '13px', color: '#666' }}>
+                          {formatTime(ts.date_arrival)} → {formatTime(ts.date_departure)} · <strong style={{ color: '#007AFF' }}>{ts.duration.toFixed(1)}h</strong>
+                          {ts.description && <span style={{ color: '#888' }}> · {ts.description}</span>}
+                        </div>
+                        {!isMobile && (ts.frais_repas > 0 || ts.frais_transport > 0 || ts.frais_autres > 0 || (ts.ik_amount || 0) > 0) && (
+                          <div style={{ fontSize: '12px', color: '#aaa', marginTop: '2px' }}>
+                            {(ts.ik_amount || 0) > 0 && <span>IK: {(ts.ik_amount || 0).toFixed(2)}€ </span>}
+                            {ts.frais_repas > 0 && <span>Repas: {ts.frais_repas}€ </span>}
+                            {ts.frais_transport > 0 && <span>Transport: {ts.frais_transport}€ </span>}
+                            {ts.frais_autres > 0 && <span>Autres: {ts.frais_autres}€</span>}
+                          </div>
+                        )}
+                      </div>
+                      {/* Boutons — compact sur mobile */}
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        {ts.status !== 'validated' ? (
+                          <button onClick={() => updateTimesheet(ts.id, { status: 'validated' })}
+                            style={{ padding: isMobile ? '5px 8px' : '6px 12px', backgroundColor: '#34C759', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}>
+                            {isMobile ? '✓' : 'Valider'}
+                          </button>
+                        ) : (
+                          <button onClick={() => updateTimesheet(ts.id, { status: 'draft' })}
+                            style={{ padding: isMobile ? '5px 8px' : '6px 12px', backgroundColor: '#FF9500', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>
+                            {isMobile ? '↩' : 'Brouillon'}
+                          </button>
+                        )}
+                        {!isMobile && (
+                          <button onClick={() => openEdit(ts)}
+                            style={{ padding: '6px 12px', backgroundColor: '#007AFF', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}>
+                            Modifier
+                          </button>
+                        )}
+                        <button onClick={() => { if (window.confirm('Supprimer ce pointage ?')) deleteTimesheet(ts.id); }}
+                          style={{ padding: isMobile ? '5px 8px' : '6px 12px', backgroundColor: '#ff3b30', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>
+                          {isMobile ? '✕' : 'Supprimer'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
       </>
       )}
 
       {/* Modal création / édition */}
       {modalMode && (
-        <div
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}
-          onClick={() => setModalMode(null)}
-        >
-          <div
-            style={{ backgroundColor: 'white', padding: '28px', borderRadius: '10px', width: '92%', maxWidth: '500px', maxHeight: '92vh', overflowY: 'auto' }}
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}
+          onClick={() => setModalMode(null)}>
+          <div style={{ backgroundColor: 'white', padding: '28px', borderRadius: '10px', width: '92%', maxWidth: '500px', maxHeight: '92vh', overflowY: 'auto' }}
+            onClick={(e) => e.stopPropagation()}>
             <h2 style={{ marginBottom: '20px', fontSize: '20px' }}>
               {modalMode === 'create' ? 'Nouveau pointage' : 'Modifier le pointage'}
             </h2>
@@ -228,13 +259,10 @@ export default function TimesheetsTab() {
                 <select value={formData.client_id} onChange={(e) => setFormData({ ...formData, client_id: e.target.value })} required style={inputStyle}>
                   <option value="">— Sélectionner un client —</option>
                   {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {[c.titre, c.first_name, c.name].filter(Boolean).join(' ')}
-                    </option>
+                    <option key={c.id} value={c.id}>{[c.titre, c.first_name, c.name].filter(Boolean).join(' ')}</option>
                   ))}
                 </select>
               </div>
-
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
                 <div>
                   <label style={labelStyle}>Date arrivée *</label>
@@ -249,7 +277,6 @@ export default function TimesheetsTab() {
                     required style={inputStyle} />
                 </div>
               </div>
-
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
                 <div>
                   <label style={labelStyle}>Date départ *</label>
@@ -264,7 +291,6 @@ export default function TimesheetsTab() {
                     required style={inputStyle} />
                 </div>
               </div>
-
               <div style={{ marginBottom: '14px' }}>
                 <label style={labelStyle}>Prestation réalisée</label>
                 <input type="text" value={formData.description}
@@ -272,27 +298,19 @@ export default function TimesheetsTab() {
                   placeholder="Ex: Assistance à domicile, Accompagnement courses..."
                   style={inputStyle} />
               </div>
-
-              {/* Indemnités kilométriques */}
               <div style={{ marginBottom: '14px', paddingTop: '12px', borderTop: '1px solid #eee' }}>
                 <label style={{ ...labelStyle, marginBottom: '10px' }}>Indemnités kilométriques</label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
                   <div>
                     <label style={{ ...labelStyle, fontSize: '11px', color: '#888' }}>Km parcourus</label>
                     <input type="number" step="0.1" value={formData.ik_km}
-                      onChange={(e) => {
-                        const km = parseFloat(e.target.value) || 0;
-                        setFormData({ ...formData, ik_km: km, ik_amount: Math.round(km * formData.ik_rate * 100) / 100 });
-                      }}
+                      onChange={(e) => { const km = parseFloat(e.target.value) || 0; setFormData({ ...formData, ik_km: km, ik_amount: Math.round(km * formData.ik_rate * 100) / 100 }); }}
                       style={inputStyle} />
                   </div>
                   <div>
                     <label style={{ ...labelStyle, fontSize: '11px', color: '#888' }}>Tarif/km (€)</label>
                     <input type="number" step="0.001" value={formData.ik_rate}
-                      onChange={(e) => {
-                        const rate = parseFloat(e.target.value) || 0;
-                        setFormData({ ...formData, ik_rate: rate, ik_amount: Math.round(formData.ik_km * rate * 100) / 100 });
-                      }}
+                      onChange={(e) => { const rate = parseFloat(e.target.value) || 0; setFormData({ ...formData, ik_rate: rate, ik_amount: Math.round(formData.ik_km * rate * 100) / 100 }); }}
                       style={inputStyle} />
                   </div>
                   <div>
@@ -303,8 +321,6 @@ export default function TimesheetsTab() {
                   </div>
                 </div>
               </div>
-
-              {/* Autres frais */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '14px' }}>
                 <div>
                   <label style={labelStyle}>Repas (€)</label>
@@ -325,14 +341,12 @@ export default function TimesheetsTab() {
                     style={inputStyle} />
                 </div>
               </div>
-
               <div style={{ marginBottom: '20px' }}>
                 <label style={labelStyle}>Notes</label>
                 <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   rows={3} placeholder="Commentaire optionnel..."
                   style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }} />
               </div>
-
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button type="button" onClick={() => setModalMode(null)}
                   style={{ flex: 1, padding: '12px', backgroundColor: '#f5f5f5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px' }}>
