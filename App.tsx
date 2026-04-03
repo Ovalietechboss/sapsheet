@@ -5,6 +5,7 @@ import { useTimesheetStore } from './src/stores/timesheetStore.supabase';
 import { useInvoiceStore } from './src/stores/invoiceStore.supabase';
 import { useMandataireStore } from './src/stores/mandataireStore.supabase';
 import { useBillingPeriodStore } from './src/stores/billingPeriodStore.supabase';
+import { setupDailyReminder } from './src/utils/notificationService';
 import LoginPage from './src/pages/LoginPage';
 import HomePage from './src/pages/HomePage';
 import ResetPasswordPage from './src/pages/ResetPasswordPage';
@@ -35,7 +36,9 @@ export default function App() {
         hydratePeriods().catch(err => console.error('Periods hydration error:', err)),
         hydrateTimesheets().catch(err => console.error('Timesheets hydration error:', err)),
         hydrateInvoices().catch(err => console.error('Invoices hydration error:', err)),
-      ]).finally(() => setIsHydrating(false));
+      ]).then(() => {
+        setupDailyReminder().catch(err => console.error('Notification setup error:', err));
+      }).finally(() => setIsHydrating(false));
     }
   }, [isAuthenticated]);
 

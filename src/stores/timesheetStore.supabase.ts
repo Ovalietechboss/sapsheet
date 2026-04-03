@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from './authStore';
+import { cancelTodayReminder } from '../utils/notificationService';
 
 export interface Timesheet {
   id: string;
@@ -87,6 +88,9 @@ export const useTimesheetStore = create<TimesheetStore>((set, get) => ({
     set((state) => ({
       timesheets: [timesheet, ...state.timesheets],
     }));
+
+    // Annuler la notification de rappel du jour
+    cancelTodayReminder().catch(() => {});
   },
 
   updateTimesheet: async (id, updates) => {
