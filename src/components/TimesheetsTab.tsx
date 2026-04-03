@@ -33,11 +33,13 @@ export default function TimesheetsTab() {
 
   const emptyForm = () => ({
     client_id: '', date_arrival: todayStr(), time_arrival: '', date_departure: todayStr(), time_departure: '',
+    direct_hours: '', // mode durée directe
     frais_repas: 0, frais_transport: 0, frais_autres: 0,
     ik_km: 0, ik_rate: DEFAULT_IK_RATE, ik_amount: 0, description: '', notes: '',
   });
 
   const [formData, setFormData] = useState(emptyForm);
+  const [saisieMode, setSaisieMode] = useState<'horaires' | 'duree'>('horaires');
 
   // ── Filtrer et grouper par jour ────────────────────────────────────────
 
@@ -89,7 +91,7 @@ export default function TimesheetsTab() {
       date_departure: ds(departure), time_departure: tms(departure),
       frais_repas: ts.frais_repas || 0, frais_transport: ts.frais_transport || 0, frais_autres: ts.frais_autres || 0,
       ik_km: ts.ik_km || 0, ik_rate: ts.ik_rate || DEFAULT_IK_RATE, ik_amount: ts.ik_amount || 0,
-      description: ts.description || '', notes: ts.notes || '',
+      direct_hours: '', description: ts.description || '', notes: ts.notes || '',
     });
     setEditingId(ts.id);
     setModalMode('edit');
@@ -98,14 +100,28 @@ export default function TimesheetsTab() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.client_id) { alert('Veuillez sélectionner un client'); return; }
-    const arrival = new Date(`${formData.date_arrival}T${formData.time_arrival}`).getTime();
-    const departure = new Date(`${formData.date_departure}T${formData.time_departure}`).getTime();
-    const duration = (departure - arrival) / (1000 * 60 * 60);
-    if (duration <= 0) { alert('L\'heure de départ doit être après l\'heure d\'arrivée'); return; }
+
+    let arrival: number, departure: number, duration: number;
+
+    if (saisieMode === 'duree') {
+      const h = parseFloat(formData.direct_hours);
+      if (!h || h <= 0) { alert('Veuillez saisir un nombre d\'heures valide'); return; }
+      duration = Math.round(h * 100) / 100;
+      // On place l'arrivée à 9h par défaut
+      arrival = new Date(`${formData.date_arrival}T09:00`).getTime();
+      departure = arrival + duration * 3600000;
+    } else {
+      if (!formData.time_arrival || !formData.time_departure) { alert('Veuillez saisir les heures'); return; }
+      arrival = new Date(`${formData.date_arrival}T${formData.time_arrival}`).getTime();
+      departure = new Date(`${formData.date_departure}T${formData.time_departure}`).getTime();
+      duration = (departure - arrival) / (1000 * 60 * 60);
+      if (duration <= 0) { alert('L\'heure de départ doit être après l\'heure d\'arrivée'); return; }
+      duration = Math.round(duration * 100) / 100;
+    }
     const pos = (v: any) => Math.max(0, parseFloat(String(v)) || 0);
     const data = {
       client_id: formData.client_id, date_arrival: arrival, date_departure: departure,
-      duration: Math.round(duration * 100) / 100,
+      duration,
       frais_repas: pos(formData.frais_repas), frais_transport: pos(formData.frais_transport), frais_autres: pos(formData.frais_autres),
       ik_km: pos(formData.ik_km), ik_rate: pos(formData.ik_rate), ik_amount: pos(formData.ik_amount),
       description: formData.description || undefined, notes: formData.notes,
@@ -263,34 +279,72 @@ export default function TimesheetsTab() {
                   ))}
                 </select>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-                <div>
-                  <label style={labelStyle}>Date arrivée *</label>
-                  <input type="date" value={formData.date_arrival}
-                    onChange={(e) => setFormData({ ...formData, date_arrival: e.target.value, date_departure: e.target.value })}
-                    required style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Heure arrivée *</label>
-                  <input type="time" value={formData.time_arrival}
-                    onChange={(e) => setFormData({ ...formData, time_arrival: e.target.value })}
-                    required style={inputStyle} />
-                </div>
+              {/* Toggle mode de saisie */}
+              <div style={{ display: 'flex', backgroundColor: '#f0f2f5', borderRadius: '8px', padding: '3px', marginBottom: '14px' }}>
+                {[
+                  { id: 'horaires' as const, label: 'Heures début/fin' },
+                  { id: 'duree' as const, label: 'Durée directe' },
+                ].map((m) => (
+                  <button key={m.id} type="button" onClick={() => setSaisieMode(m.id)}
+                    style={{
+                      flex: 1, padding: '8px', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                      backgroundColor: saisieMode === m.id ? 'white' : 'transparent',
+                      color: saisieMode === m.id ? '#007AFF' : '#888',
+                      boxShadow: saisieMode === m.id ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+                    }}>
+                    {m.label}
+                  </button>
+                ))}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-                <div>
-                  <label style={labelStyle}>Date départ *</label>
-                  <input type="date" value={formData.date_departure}
-                    onChange={(e) => setFormData({ ...formData, date_departure: e.target.value })}
-                    required style={inputStyle} />
+
+              {saisieMode === 'horaires' ? (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                    <div>
+                      <label style={labelStyle}>Date arrivée *</label>
+                      <input type="date" value={formData.date_arrival}
+                        onChange={(e) => setFormData({ ...formData, date_arrival: e.target.value, date_departure: e.target.value })}
+                        required style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Heure arrivée *</label>
+                      <input type="time" value={formData.time_arrival}
+                        onChange={(e) => setFormData({ ...formData, time_arrival: e.target.value })}
+                        required style={inputStyle} />
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                    <div>
+                      <label style={labelStyle}>Date départ *</label>
+                      <input type="date" value={formData.date_departure}
+                        onChange={(e) => setFormData({ ...formData, date_departure: e.target.value })}
+                        required style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Heure départ *</label>
+                      <input type="time" value={formData.time_departure}
+                        onChange={(e) => setFormData({ ...formData, time_departure: e.target.value })}
+                        required style={inputStyle} />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                  <div>
+                    <label style={labelStyle}>Date *</label>
+                    <input type="date" value={formData.date_arrival}
+                      onChange={(e) => setFormData({ ...formData, date_arrival: e.target.value, date_departure: e.target.value })}
+                      required style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Nombre d'heures *</label>
+                    <input type="number" step="0.25" value={formData.direct_hours}
+                      onChange={(e) => setFormData({ ...formData, direct_hours: e.target.value })}
+                      placeholder="Ex: 2.5"
+                      style={{ ...inputStyle, fontSize: '18px', fontWeight: 'bold', color: '#007AFF' }} />
+                  </div>
                 </div>
-                <div>
-                  <label style={labelStyle}>Heure départ *</label>
-                  <input type="time" value={formData.time_departure}
-                    onChange={(e) => setFormData({ ...formData, time_departure: e.target.value })}
-                    required style={inputStyle} />
-                </div>
-              </div>
+              )}
               <div style={{ marginBottom: '14px' }}>
                 <label style={labelStyle}>Prestation réalisée</label>
                 <input type="text" value={formData.description}
