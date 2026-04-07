@@ -40,6 +40,7 @@ export default function TimesheetsTab() {
 
   const [formData, setFormData] = useState(emptyForm);
   const [saisieMode, setSaisieMode] = useState<'horaires' | 'duree'>('duree');
+  const [showOptions, setShowOptions] = useState(false);
 
   // ── Filtrer et grouper par jour ────────────────────────────────────────
 
@@ -79,7 +80,7 @@ export default function TimesheetsTab() {
 
   // ── Helpers ────────────────────────────────────────────────────────────
 
-  const openCreate = () => { setFormData(emptyForm()); setEditingId(null); setModalMode('create'); };
+  const openCreate = () => { setFormData(emptyForm()); setEditingId(null); setShowOptions(false); setModalMode('create'); };
 
   const openEdit = (ts: Timesheet) => {
     const arrival = new Date(ts.date_arrival);
@@ -94,6 +95,8 @@ export default function TimesheetsTab() {
       direct_hours: '', description: ts.description || '', notes: ts.notes || '',
     });
     setEditingId(ts.id);
+    // Ouvrir les options si des frais/IK/notes existent
+    setShowOptions(!!(ts.ik_amount || ts.frais_repas || ts.frais_transport || ts.frais_autres || ts.notes));
     setModalMode('edit');
   };
 
@@ -352,55 +355,75 @@ export default function TimesheetsTab() {
                   placeholder="Ex: Assistance à domicile, Accompagnement courses..."
                   style={inputStyle} />
               </div>
-              <div style={{ marginBottom: '14px', paddingTop: '12px', borderTop: '1px solid #eee' }}>
-                <label style={{ ...labelStyle, marginBottom: '10px' }}>Indemnités kilométriques</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                  <div>
-                    <label style={{ ...labelStyle, fontSize: '11px', color: '#888' }}>Km parcourus</label>
-                    <input type="number" step="0.1" value={formData.ik_km}
-                      onChange={(e) => { const km = parseFloat(e.target.value) || 0; setFormData({ ...formData, ik_km: km, ik_amount: Math.round(km * formData.ik_rate * 100) / 100 }); }}
-                      style={inputStyle} />
+              {/* Bloc dépliable : frais, IK, notes */}
+              <button type="button" onClick={() => setShowOptions(!showOptions)}
+                style={{
+                  width: '100%', padding: '12px', marginBottom: '14px',
+                  backgroundColor: showOptions ? '#f0f2f5' : 'white',
+                  border: '1px solid #ddd', borderRadius: '8px',
+                  cursor: 'pointer', fontSize: '14px', fontWeight: '600',
+                  color: '#555', textAlign: 'left',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }}>
+                <span>Frais, kilomètres, notes</span>
+                <span style={{ fontSize: '12px', color: '#888' }}>{showOptions ? '▲ Masquer' : '▼ Afficher'}</span>
+              </button>
+
+              {showOptions && (
+                <div style={{ padding: '16px', backgroundColor: '#f9f9fb', borderRadius: '8px', marginBottom: '14px' }}>
+                  {/* Kilomètres */}
+                  <label style={{ ...labelStyle, marginBottom: '10px' }}>Kilomètres</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: '13px', color: '#555' }}>Km parcourus</label>
+                      <input type="number" step="0.1" value={formData.ik_km}
+                        onChange={(e) => { const km = parseFloat(e.target.value) || 0; setFormData({ ...formData, ik_km: km, ik_amount: Math.round(km * formData.ik_rate * 100) / 100 }); }}
+                        style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: '13px', color: '#555' }}>Tarif/km (€)</label>
+                      <input type="number" step="0.001" value={formData.ik_rate}
+                        onChange={(e) => { const rate = parseFloat(e.target.value) || 0; setFormData({ ...formData, ik_rate: rate, ik_amount: Math.round(formData.ik_km * rate * 100) / 100 }); }}
+                        style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: '13px', color: '#555' }}>Montant (€)</label>
+                      <input type="number" step="0.01" value={formData.ik_amount}
+                        onChange={(e) => setFormData({ ...formData, ik_amount: parseFloat(e.target.value) || 0 })}
+                        style={{ ...inputStyle, fontWeight: 'bold', color: '#007AFF' }} />
+                    </div>
                   </div>
-                  <div>
-                    <label style={{ ...labelStyle, fontSize: '11px', color: '#888' }}>Tarif/km (€)</label>
-                    <input type="number" step="0.001" value={formData.ik_rate}
-                      onChange={(e) => { const rate = parseFloat(e.target.value) || 0; setFormData({ ...formData, ik_rate: rate, ik_amount: Math.round(formData.ik_km * rate * 100) / 100 }); }}
-                      style={inputStyle} />
+
+                  {/* Frais */}
+                  <label style={{ ...labelStyle, marginBottom: '10px' }}>Frais</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: '13px', color: '#555' }}>Repas (€)</label>
+                      <input type="number" step="0.01" value={formData.frais_repas}
+                        onChange={(e) => setFormData({ ...formData, frais_repas: parseFloat(e.target.value) || 0 })}
+                        style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: '13px', color: '#555' }}>Transport (€)</label>
+                      <input type="number" step="0.01" value={formData.frais_transport}
+                        onChange={(e) => setFormData({ ...formData, frais_transport: parseFloat(e.target.value) || 0 })}
+                        style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: '13px', color: '#555' }}>Autres (€)</label>
+                      <input type="number" step="0.01" value={formData.frais_autres}
+                        onChange={(e) => setFormData({ ...formData, frais_autres: parseFloat(e.target.value) || 0 })}
+                        style={inputStyle} />
+                    </div>
                   </div>
-                  <div>
-                    <label style={{ ...labelStyle, fontSize: '11px', color: '#888' }}>Montant IK (€)</label>
-                    <input type="number" step="0.01" value={formData.ik_amount}
-                      onChange={(e) => setFormData({ ...formData, ik_amount: parseFloat(e.target.value) || 0 })}
-                      style={{ ...inputStyle, fontWeight: 'bold', color: '#007AFF' }} />
-                  </div>
+
+                  {/* Notes */}
+                  <label style={labelStyle}>Notes</label>
+                  <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    rows={2} placeholder="Commentaire optionnel..."
+                    style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }} />
                 </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-                <div>
-                  <label style={labelStyle}>Repas (€)</label>
-                  <input type="number" step="0.01" value={formData.frais_repas}
-                    onChange={(e) => setFormData({ ...formData, frais_repas: parseFloat(e.target.value) || 0 })}
-                    style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Transport (€)</label>
-                  <input type="number" step="0.01" value={formData.frais_transport}
-                    onChange={(e) => setFormData({ ...formData, frais_transport: parseFloat(e.target.value) || 0 })}
-                    style={inputStyle} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Autres (€)</label>
-                  <input type="number" step="0.01" value={formData.frais_autres}
-                    onChange={(e) => setFormData({ ...formData, frais_autres: parseFloat(e.target.value) || 0 })}
-                    style={inputStyle} />
-                </div>
-              </div>
-              <div style={{ marginBottom: '20px' }}>
-                <label style={labelStyle}>Notes</label>
-                <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  rows={3} placeholder="Commentaire optionnel..."
-                  style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }} />
-              </div>
+              )}
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button type="button" onClick={() => setModalMode(null)}
                   style={{ flex: 1, padding: '12px', backgroundColor: '#f5f5f5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px' }}>
