@@ -1,5 +1,9 @@
 # Dependencies
 node_modules/
+
+# Keystore (ne jamais commiter)
+*.keystore
+android/keystore.properties
 .pnp
 .pnp.js
 
