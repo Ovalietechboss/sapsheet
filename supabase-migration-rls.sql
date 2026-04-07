@@ -8,7 +8,7 @@
 
 CREATE OR REPLACE FUNCTION public.get_my_user_id()
 RETURNS TEXT AS $$
-  SELECT id FROM public.users WHERE auth_id = auth.uid()::text LIMIT 1;
+  SELECT id FROM public.users WHERE auth_id = CAST(auth.uid() AS text) LIMIT 1;
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
 -- Fonction helper : vérifier si l'utilisateur connecté est admin
@@ -16,7 +16,7 @@ CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.users
-    WHERE auth_id = auth.uid()::text AND role = 'admin'
+    WHERE auth_id = CAST(auth.uid() AS text) AND role = 'admin'
   );
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
@@ -35,11 +35,11 @@ DROP POLICY IF EXISTS "users_delete" ON public.users;
 
 -- Lecture : son propre profil OU admin voit tout
 CREATE POLICY "users_select" ON public.users
-  FOR SELECT USING (auth_id = auth.uid()::text OR public.is_admin());
+  FOR SELECT USING (auth_id = CAST(auth.uid() AS text) OR public.is_admin());
 
 -- Modification : son propre profil uniquement
 CREATE POLICY "users_update" ON public.users
-  FOR UPDATE USING (auth_id = auth.uid()::text);
+  FOR UPDATE USING (auth_id = CAST(auth.uid() AS text));
 
 -- Insertion : autorisée (pour le signup)
 CREATE POLICY "users_insert" ON public.users
