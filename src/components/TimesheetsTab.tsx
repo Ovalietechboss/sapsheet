@@ -39,7 +39,7 @@ export default function TimesheetsTab() {
   });
 
   const [formData, setFormData] = useState(emptyForm);
-  const [saisieMode, setSaisieMode] = useState<'horaires' | 'duree'>('horaires');
+  const [saisieMode, setSaisieMode] = useState<'horaires' | 'duree'>('duree');
 
   // ── Filtrer et grouper par jour ────────────────────────────────────────
 
@@ -282,8 +282,8 @@ export default function TimesheetsTab() {
               {/* Toggle mode de saisie */}
               <div style={{ display: 'flex', backgroundColor: '#f0f2f5', borderRadius: '8px', padding: '3px', marginBottom: '14px' }}>
                 {[
-                  { id: 'horaires' as const, label: 'Heures début/fin' },
                   { id: 'duree' as const, label: 'Durée directe' },
+                  { id: 'horaires' as const, label: 'Heures début/fin' },
                 ].map((m) => (
                   <button key={m.id} type="button" onClick={() => setSaisieMode(m.id)}
                     style={{
