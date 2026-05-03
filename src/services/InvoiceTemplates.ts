@@ -2,6 +2,7 @@ import { Invoice } from '../stores/invoiceStore.supabase';
 import { Client, ClientContact } from '../stores/clientStore.supabase';
 import { Timesheet } from '../stores/timesheetStore.supabase';
 import { Mandataire } from '../stores/mandataireStore.supabase';
+import { isDureeDirecte } from '../utils/timesheetMode';
 
 interface User {
   displayName: string;
@@ -58,11 +59,12 @@ export const generateCESUTemplate = (
     const salaire = Math.round(ts.duration * hourlyRate * 100) / 100;
     const ikJour = ts.ik_amount || 0;
     const fraisJour = (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + ikJour;
+    const isDuree = isDureeDirecte(ts);
     return `
     <tr>
       <td style="${tdBase}">${formatDate(ts.date_arrival)}</td>
-      <td style="${tdBase} text-align: center;">${formatTime(ts.date_arrival)}</td>
-      <td style="${tdBase} text-align: center;">${formatTime(ts.date_departure)}</td>
+      <td style="${tdBase} text-align: center;">${isDuree ? '—' : formatTime(ts.date_arrival)}</td>
+      <td style="${tdBase} text-align: center;">${isDuree ? '—' : formatTime(ts.date_departure)}</td>
       <td style="${tdBase} text-align: right;">${ts.duration.toFixed(2)}h</td>
       <td style="${tdBase} text-align: right;">${salaire.toFixed(2)}€</td>
       <td style="${tdBase} text-align: right;">${ikJour > 0 ? ikJour.toFixed(2) + '€' : '-'}</td>

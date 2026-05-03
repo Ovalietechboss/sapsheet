@@ -5,6 +5,7 @@ import { useTimesheetStore } from '../stores/timesheetStore.supabase';
 import { useClientStore } from '../stores/clientStore.supabase';
 import { useMandataireStore } from '../stores/mandataireStore.supabase';
 import { useBillingPeriodStore } from '../stores/billingPeriodStore.supabase';
+import { isDureeDirecte } from '../utils/timesheetMode';
 
 const MONTHS = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -323,13 +324,14 @@ export default function DashboardTab({ onNavigate }: Props) {
             {recentTimesheets.map((ts) => {
               const date = new Date(ts.date_arrival);
               const dateStr = date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+              const isDuree = isDureeDirecte(ts);
               const startTime = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
               const endTime = new Date(ts.date_departure).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
               return (
                 <div key={ts.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'white', borderRadius: '10px', border: '1px solid #eee' }}>
                   <div>
                     <div style={{ fontWeight: '600', fontSize: '14px', color: '#333' }}>{ts.clientName}</div>
-                    <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{dateStr} · {startTime} → {endTime}</div>
+                    <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{dateStr}{!isDuree && ` · ${startTime} → ${endTime}`}</div>
                   </div>
                   <div style={{ fontWeight: 'bold', fontSize: '15px', color: '#007AFF' }}>{ts.duration.toFixed(1)}h</div>
                 </div>

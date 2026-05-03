@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useTimesheetStore, Timesheet } from '../stores/timesheetStore.supabase';
 import { useClientStore } from '../stores/clientStore.supabase';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { isDureeDirecte } from '../utils/timesheetMode';
 import ImportRapide from './ImportRapide';
 
 const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
@@ -87,12 +88,14 @@ export default function TimesheetsTab() {
     const departure = new Date(ts.date_departure);
     const ds = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const tms = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const isDuree = isDureeDirecte(ts);
+    setSaisieMode(isDuree ? 'duree' : 'horaires');
     setFormData({
-      client_id: ts.client_id, date_arrival: ds(arrival), time_arrival: tms(arrival),
-      date_departure: ds(departure), time_departure: tms(departure),
+      client_id: ts.client_id, date_arrival: ds(arrival), time_arrival: isDuree ? '' : tms(arrival),
+      date_departure: ds(departure), time_departure: isDuree ? '' : tms(departure),
       frais_repas: ts.frais_repas || 0, frais_transport: ts.frais_transport || 0, frais_autres: ts.frais_autres || 0,
       ik_km: ts.ik_km || 0, ik_rate: ts.ik_rate || DEFAULT_IK_RATE, ik_amount: ts.ik_amount || 0,
-      direct_hours: '', description: ts.description || '', notes: ts.notes || '',
+      direct_hours: isDuree ? ts.duration.toString() : '', description: ts.description || '', notes: ts.notes || '',
     });
     setEditingId(ts.id);
     // Ouvrir les options si des frais/IK/notes existent
@@ -216,7 +219,8 @@ export default function TimesheetsTab() {
                           </span>
                         </div>
                         <div style={{ fontSize: '13px', color: '#666' }}>
-                          {formatTime(ts.date_arrival)} → {formatTime(ts.date_departure)} · <strong style={{ color: '#007AFF' }}>{ts.duration.toFixed(1)}h</strong>
+                          {!isDureeDirecte(ts) && <>{formatTime(ts.date_arrival)} → {formatTime(ts.date_departure)} · </>}
+                          <strong style={{ color: '#007AFF' }}>{ts.duration.toFixed(1)}h</strong>
                           {ts.description && <span style={{ color: '#888' }}> · {ts.description}</span>}
                         </div>
                         {!isMobile && (ts.frais_repas > 0 || ts.frais_transport > 0 || ts.frais_autres > 0 || (ts.ik_amount || 0) > 0) && (

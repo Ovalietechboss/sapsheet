@@ -8,6 +8,7 @@ import { useMandataireStore } from '../stores/mandataireStore.supabase';
 import { useAuthStore } from '../stores/authStore';
 import { generateCESUTemplate, generateClassicalTemplate } from '../services/InvoiceTemplates';
 import { generateAndSharePDF } from '../utils/pdfGenerator';
+import { isDureeDirecte } from '../utils/timesheetMode';
 
 const MONTHS = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -86,11 +87,12 @@ export default function ReportsTab() {
       const hourlyRate = client?.hourly_rate || 0;
       const earnings = ts.duration * hourlyRate;
       const total = earnings + (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0);
+      const isDuree = isDureeDirecte(ts);
       return [
         new Date(ts.date_arrival).toLocaleDateString('fr-FR'),
         client?.name || '',
-        new Date(ts.date_arrival).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-        new Date(ts.date_departure).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+        isDuree ? '' : new Date(ts.date_arrival).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+        isDuree ? '' : new Date(ts.date_departure).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
         ts.duration.toFixed(2),
         hourlyRate.toFixed(2),
         earnings.toFixed(2),

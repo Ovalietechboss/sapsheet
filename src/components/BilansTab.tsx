@@ -9,6 +9,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useBillingPeriodStore, BillingPeriod, ClientDocStatus } from '../stores/billingPeriodStore.supabase';
 import { generateCESUTemplate, generateClassicalTemplate } from '../services/InvoiceTemplates';
 import { generateAndSharePDF } from '../utils/pdfGenerator';
+import { isDureeDirecte } from '../utils/timesheetMode';
 
 const MONTHS = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -206,11 +207,12 @@ export default function BilansTab() {
       const rate = client?.hourly_rate || 0;
       const earnings = ts.duration * rate;
       const frais = (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + (Math.max(0, ts.ik_amount || 0));
+      const isDuree = isDureeDirecte(ts);
       return [
         new Date(ts.date_arrival).toLocaleDateString('fr-FR'),
         client ? [client.titre, client.first_name, client.name].filter(Boolean).join(' ') : '',
-        new Date(ts.date_arrival).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-        new Date(ts.date_departure).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+        isDuree ? '' : new Date(ts.date_arrival).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+        isDuree ? '' : new Date(ts.date_departure).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
         ts.duration.toFixed(2), rate.toFixed(2), earnings.toFixed(2),
         (Math.max(0, ts.ik_amount || 0)).toFixed(2),
         (ts.frais_repas || 0).toFixed(2), (ts.frais_transport || 0).toFixed(2), (ts.frais_autres || 0).toFixed(2),
@@ -508,7 +510,8 @@ export default function BilansTab() {
                     </span>
                   </div>
                   <div style={{ fontSize: '13px', color: '#666' }}>
-                    {formatDate(ts.date_arrival)} · {formatTime(ts.date_arrival)} → {formatTime(ts.date_departure)}
+                    {formatDate(ts.date_arrival)}
+                    {!isDureeDirecte(ts) && ` · ${formatTime(ts.date_arrival)} → ${formatTime(ts.date_departure)}`}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
