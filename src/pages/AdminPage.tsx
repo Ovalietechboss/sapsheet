@@ -20,12 +20,27 @@ interface UserStats {
   timesheetThisMonth: number;
 }
 
+interface MonthStatus {
+  userId: string;
+  draftCount: number;
+  validatedCount: number;
+  totalHours: number;
+  periodStatus: 'open' | 'locked' | 'archived' | null;
+}
+
+interface DbCounters {
+  totalTimesheets: number;
+  totalClients: number;
+}
+
 export default function AdminPage() {
   const { user, impersonate, stopImpersonating, isImpersonating, realAdmin, logout } = useAuthStore();
   const [users, setUsers] = useState<DbUser[]>([]);
   const [stats, setStats] = useState<UserStats[]>([]);
+  const [monthStatuses, setMonthStatuses] = useState<MonthStatus[]>([]);
+  const [dbCounters, setDbCounters] = useState<DbCounters>({ totalTimesheets: 0, totalClients: 0 });
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState<'dashboard' | 'users' | 'settings'>('dashboard');
+  const [activeSection, setActiveSection] = useState<'dashboard' | 'users' | 'maintenance' | 'settings'>('dashboard');
   const [impersonating, setImpersonating] = useState<string | null>(null);
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [createForm, setCreateForm] = useState({ email: '', password: '', display_name: '', type: 'assistant' as 'assistant' | 'employer' });
@@ -39,16 +54,20 @@ export default function AdminPage() {
 
   const loadData = async () => {
     setLoading(true);
-    const [{ data: usersData }, { data: clientsData }, { data: tsData }] = await Promise.all([
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime();
+
+    const [{ data: usersData }, { data: clientsData }, { data: tsData }, { data: bpData }] = await Promise.all([
       supabase.from('users').select('*').order('created_at', { ascending: false }),
       supabase.from('clients').select('id, user_id'),
-      supabase.from('timesheets').select('id, user_id, date_arrival'),
+      supabase.from('timesheets').select('id, user_id, date_arrival, duration, status'),
+      supabase.from('billing_periods').select('id, user_id, status').eq('month', currentMonth).eq('year', currentYear),
     ]);
 
     setUsers(usersData || []);
-
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 
     const userStats: UserStats[] = (usersData || []).map((u: DbUser) => ({
       userId: u.id,
@@ -59,6 +78,27 @@ export default function AdminPage() {
       ).length,
     }));
     setStats(userStats);
+
+    const statuses: MonthStatus[] = (usersData || []).map((u: DbUser) => {
+      const myTs = (tsData || []).filter((t: any) =>
+        t.user_id === u.id && t.date_arrival >= monthStart && t.date_arrival <= monthEnd
+      );
+      const period = (bpData || []).find((p: any) => p.user_id === u.id);
+      return {
+        userId: u.id,
+        draftCount: myTs.filter((t: any) => t.status === 'draft').length,
+        validatedCount: myTs.filter((t: any) => t.status === 'validated').length,
+        totalHours: myTs.reduce((s: number, t: any) => s + (t.duration || 0), 0),
+        periodStatus: period?.status || null,
+      };
+    });
+    setMonthStatuses(statuses);
+
+    setDbCounters({
+      totalTimesheets: (tsData || []).length,
+      totalClients: (clientsData || []).length,
+    });
+
     setLoading(false);
   };
 
@@ -161,6 +201,7 @@ export default function AdminPage() {
           {[
             { id: 'dashboard' as const, label: '📊 Dashboard', },
             { id: 'users' as const, label: '👥 Utilisateurs' },
+            { id: 'maintenance' as const, label: '🔧 Maintenance' },
             { id: 'settings' as const, label: '⚙️ Paramètres' },
           ].map((item) => (
             <button
@@ -325,6 +366,93 @@ export default function AdminPage() {
               </>
             )}
 
+            {/* ══════ MAINTENANCE ══════ */}
+            {activeSection === 'maintenance' && (
+              <>
+                <h1 style={{ margin: '0 0 8px', fontSize: '24px', color: '#1a1a2e' }}>Maintenance & monitoring</h1>
+                <p style={{ color: '#666', fontSize: '13px', marginBottom: '24px' }}>État du mois en cours, compteurs DB et accès rapides aux outils externes.</p>
+
+                {/* Activité du mois en cours par utilisateur */}
+                <h2 style={{ fontSize: '16px', color: '#333', marginBottom: '12px' }}>Activité ce mois — alerte si drafts non validés</h2>
+                <div style={{ display: 'grid', gap: '12px', marginBottom: '32px' }}>
+                  {users.filter((u) => u.role !== 'admin').length === 0 && (
+                    <div style={{ background: '#f9f9fb', padding: '20px', borderRadius: '12px', textAlign: 'center', color: '#888', fontSize: '13px' }}>
+                      Aucun utilisateur non-admin
+                    </div>
+                  )}
+                  {users.filter((u) => u.role !== 'admin').map((u) => {
+                    const ms = monthStatuses.find((s) => s.userId === u.id);
+                    const draftAlert = (ms?.draftCount || 0) > 0;
+                    const periodLabel = ms?.periodStatus
+                      ? { open: 'Ouvert', locked: 'Clôturé', archived: 'Archivé' }[ms.periodStatus]
+                      : 'Aucune période ce mois';
+                    const periodColor = ms?.periodStatus === 'locked' || ms?.periodStatus === 'archived'
+                      ? '#34C759' : ms?.periodStatus === 'open' ? '#FF9500' : '#888';
+                    return (
+                      <div key={u.id} style={{ background: 'white', padding: '18px 20px', borderRadius: '12px', border: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+                        <div>
+                          <div style={{ fontWeight: '600', fontSize: '15px' }}>{u.display_name}</div>
+                          <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{u.email}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Période</div>
+                            <span style={{ display: 'inline-block', marginTop: '4px', padding: '3px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold', backgroundColor: periodColor + '22', color: periodColor, border: `1px solid ${periodColor}44` }}>
+                              {periodLabel}
+                            </span>
+                          </div>
+                          <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Drafts</div>
+                            <div style={{ fontSize: '20px', fontWeight: 'bold', color: draftAlert ? '#FF9500' : '#888', marginTop: '2px' }}>{ms?.draftCount || 0}</div>
+                          </div>
+                          <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Validés</div>
+                            <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#34C759', marginTop: '2px' }}>{ms?.validatedCount || 0}</div>
+                          </div>
+                          <div style={{ textAlign: 'center' }}>
+                            <div style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Heures</div>
+                            <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1a6fb5', marginTop: '2px' }}>{(ms?.totalHours || 0).toFixed(1)}h</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Compteurs DB */}
+                <h2 style={{ fontSize: '16px', color: '#333', marginBottom: '12px' }}>Compteurs base de données</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', marginBottom: '32px' }}>
+                  <DashCard label="Utilisateurs" value={String(users.length)} color="#007AFF" bg="#E8F4FF" />
+                  <DashCard label="Clients (total)" value={String(dbCounters.totalClients)} color="#34C759" bg="#EBF9F0" />
+                  <DashCard label="Pointages (total)" value={String(dbCounters.totalTimesheets)} color="#FF9500" bg="#FFF4E5" />
+                </div>
+
+                {/* Outils externes */}
+                <h2 style={{ fontSize: '16px', color: '#333', marginBottom: '12px' }}>Outils & monitoring externes</h2>
+                <div style={{ display: 'grid', gap: '12px', maxWidth: '720px', marginBottom: '32px' }}>
+                  <ExtLink href="https://github.com/Ovalietechboss/sapsheet/actions/workflows/backup-db.yml"
+                    title="Backups DB GitHub Actions"
+                    desc="Voir les runs du workflow Backup DB (cron quotidien 03:17 UTC) et télécharger les artifacts .sql.gz" emoji="💾" />
+                  <ExtLink href="https://supabase.com/dashboard/project/nguzknvzqfznyosbiqkr"
+                    title="Supabase Dashboard"
+                    desc="Authentification, tables, storage, logs, SQL Editor" emoji="🗄️" />
+                  <ExtLink href="https://supabase.com/dashboard/project/nguzknvzqfznyosbiqkr/sql/new"
+                    title="Supabase SQL Editor"
+                    desc="Lancer des requêtes SQL ad hoc directement sur la prod (lecture seule recommandée)" emoji="⚙️" />
+                  <ExtLink href="https://vercel.com/dashboard"
+                    title="Vercel Dashboard"
+                    desc="Déploiements, env vars, logs runtime" emoji="🚀" />
+                  <ExtLink href="https://github.com/Ovalietechboss/sapsheet"
+                    title="Repo GitHub"
+                    desc="Code source, issues, releases" emoji="📦" />
+                </div>
+
+                <div style={{ background: '#FFF8E7', border: '1px solid #FFCC00', borderRadius: '8px', padding: '12px 16px', fontSize: '13px', color: '#856400' }}>
+                  ℹ️ Page minimaliste pour DomiTemps. Évolutions possibles V2 : intégration directe du statut backup GitHub via Edge Function, alertes email automatiques en cas de drafts non validés en fin de mois.
+                </div>
+              </>
+            )}
+
             {/* ══════ PARAMÈTRES ══════ */}
             {activeSection === 'settings' && (
               <>
@@ -439,5 +567,22 @@ function DashCard({ label, value, color, bg }: { label: string; value: string; c
       <div style={{ fontSize: '11px', textTransform: 'uppercase', color, letterSpacing: '0.5px', marginBottom: '6px', fontWeight: '600' }}>{label}</div>
       <div style={{ fontSize: '28px', fontWeight: 'bold', color }}>{value}</div>
     </div>
+  );
+}
+
+// ── Lien externe (Maintenance) ────────────────────────────────────────────────
+function ExtLink({ href, title, desc, emoji }: { href: string; title: string; desc: string; emoji: string }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer"
+      style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 18px', background: 'white', borderRadius: '10px', border: '1px solid #eee', textDecoration: 'none', color: 'inherit', transition: 'border-color 0.15s' }}
+      onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#007AFF')}
+      onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#eee')}>
+      <span style={{ fontSize: '24px' }}>{emoji}</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: '600', fontSize: '14px', color: '#1a1a2e' }}>{title}</div>
+        <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{desc}</div>
+      </div>
+      <span style={{ fontSize: '14px', color: '#007AFF', fontWeight: 'bold' }}>↗</span>
+    </a>
   );
 }
