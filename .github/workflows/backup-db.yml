@@ -1,0 +1,40 @@
+name: Backup DB
+
+on:
+  schedule:
+    - cron: '17 3 * * *' # 03:17 UTC chaque jour (évite le pic des :00)
+  workflow_dispatch: # déclenchement manuel depuis l'onglet Actions
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install postgresql-client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-16
+
+      - name: Dump database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          ts=$(date -u +%Y%m%d-%H%M)
+          file="backup-domitemps-${ts}.sql.gz"
+          pg_dump --no-owner --no-acl --clean --if-exists "$DATABASE_URL" | gzip -9 > "$file"
+          size=$(du -h "$file" | cut -f1)
+          rows=$(zcat "$file" | wc -l)
+          echo "FILE_NAME=$file" >> "$GITHUB_ENV"
+          echo "## Backup terminé" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Fichier : \`$file\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Taille : $size" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Lignes SQL : $rows" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Date UTC : $(date -u)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload backup as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILE_NAME }}
+          path: ${{ env.FILE_NAME }}
+          retention-days: 90
+          if-no-files-found: error
