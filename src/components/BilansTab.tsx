@@ -65,6 +65,8 @@ export default function BilansTab() {
   const [confirmLock, setConfirmLock] = useState(false);
   const [subView, setSubView] = useState<SubView>('documents');
   const [showNova, setShowNova] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; mode: 'CESU' | 'CLASSICAL' } | null>(null);
+  const [confirmBulk, setConfirmBulk] = useState<{ mode: 'CESU' | 'CLASSICAL'; alreadyGen: number; pending: number } | null>(null);
 
   const years = Array.from({ length: 5 }, (_, i) => currentDate.getFullYear() - 3 + i).reverse();
 
@@ -196,6 +198,42 @@ export default function BilansTab() {
     } finally {
       setGenerating(null);
     }
+  };
+
+  // ── Génération en masse ────────────────────────────────────────────────────
+
+  const handleGenerateBulk = async (mode: 'CESU' | 'CLASSICAL', force: boolean) => {
+    if (isLocked || !user || !userProfile) return;
+    const allClients = groups.flatMap((g) => g.clients);
+    const targets = allClients.filter((r) =>
+      r.facturationMode === mode &&
+      r.timesheetCount > 0 &&
+      (force || r.docStatus === 'pending')
+    );
+    if (targets.length === 0) return;
+    setBulkProgress({ done: 0, total: targets.length, mode });
+    for (let i = 0; i < targets.length; i++) {
+      await handleGenerate(targets[i]);
+      setBulkProgress({ done: i + 1, total: targets.length, mode });
+    }
+    setBulkProgress(null);
+  };
+
+  const startBulk = (mode: 'CESU' | 'CLASSICAL') => {
+    if (isLocked) return;
+    const targets = groups.flatMap((g) => g.clients).filter(
+      (r) => r.facturationMode === mode && r.timesheetCount > 0
+    );
+    if (targets.length === 0) {
+      alert(`Aucun client ${mode === 'CESU' ? 'CESU' : 'classique'} avec des pointages ce mois.`);
+      return;
+    }
+    const alreadyGen = targets.filter((r) => r.docStatus === 'generated' || r.docStatus === 'sent').length;
+    if (alreadyGen > 0) {
+      setConfirmBulk({ mode, alreadyGen, pending: targets.length - alreadyGen });
+      return;
+    }
+    handleGenerateBulk(mode, false);
   };
 
   // ── Export CSV ─────────────────────────────────────────────────────────────
@@ -466,11 +504,41 @@ export default function BilansTab() {
             );
           })}
 
+          {/* Génération en masse */}
+          {!isLocked && totalClientsActive > 0 && (() => {
+            const all = groups.flatMap((g) => g.clients).filter((r) => r.timesheetCount > 0);
+            const cesuCount = all.filter((r) => r.facturationMode === 'CESU').length;
+            const classicCount = all.filter((r) => r.facturationMode === 'CLASSICAL').length;
+            return (
+              <div style={{ marginTop: '20px', display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                {cesuCount > 0 && (
+                  <button onClick={() => startBulk('CESU')} disabled={!!bulkProgress}
+                    style={{ padding: '12px 24px', backgroundColor: bulkProgress ? '#ccc' : '#34C759', color: 'white', border: 'none', borderRadius: '8px', cursor: bulkProgress ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: 'bold' }}>
+                    Générer tous les CESU ({cesuCount})
+                  </button>
+                )}
+                {classicCount > 0 && (
+                  <button onClick={() => startBulk('CLASSICAL')} disabled={!!bulkProgress}
+                    style={{ padding: '12px 24px', backgroundColor: bulkProgress ? '#ccc' : '#007AFF', color: 'white', border: 'none', borderRadius: '8px', cursor: bulkProgress ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: 'bold' }}>
+                    Générer toutes les factures ({classicCount})
+                  </button>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Progression bulk */}
+          {bulkProgress && (
+            <div style={{ marginTop: '12px', textAlign: 'center', color: '#666', fontSize: '13px' }}>
+              Génération {bulkProgress.mode === 'CESU' ? 'CESU' : 'factures'} en cours… <strong>{bulkProgress.done}/{bulkProgress.total}</strong>
+            </div>
+          )}
+
           {/* Bouton clôture */}
           {!isLocked && totalClientsActive > 0 && (
             <div style={{ marginTop: '24px', textAlign: 'center' }}>
-              <button onClick={() => setConfirmLock(true)}
-                style={{ padding: '14px 36px', backgroundColor: '#FF9500', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}>
+              <button onClick={() => setConfirmLock(true)} disabled={!!bulkProgress}
+                style={{ padding: '14px 36px', backgroundColor: bulkProgress ? '#ccc' : '#FF9500', color: 'white', border: 'none', borderRadius: '8px', cursor: bulkProgress ? 'not-allowed' : 'pointer', fontSize: '16px', fontWeight: 'bold' }}>
                 Clôturer {MONTHS[selectedMonth - 1]} {selectedYear}
               </button>
               <p style={{ color: '#999', fontSize: '12px', marginTop: '8px' }}>Les pointages ne pourront plus être modifiés pour ce mois.</p>
@@ -544,6 +612,38 @@ export default function BilansTab() {
               <button onClick={() => setConfirmLock(false)} style={{ flex: 1, padding: '12px', background: '#f5f5f5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Annuler</button>
               <button onClick={handleLock} disabled={locking} style={{ flex: 1, padding: '12px', background: locking ? '#ccc' : '#FF9500', color: 'white', border: 'none', borderRadius: '8px', cursor: locking ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>
                 {locking ? 'Clôture...' : 'Confirmer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal confirmation régénération en masse */}
+      {confirmBulk && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }} onClick={() => setConfirmBulk(null)}>
+          <div style={{ background: 'white', padding: '32px', borderRadius: '12px', width: '90%', maxWidth: '460px' }} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ marginBottom: '12px' }}>
+              {confirmBulk.mode === 'CESU' ? 'Régénérer les CESU ?' : 'Régénérer les factures ?'}
+            </h2>
+            <p style={{ color: '#555', marginBottom: '12px', lineHeight: '1.5' }}>
+              <strong>{confirmBulk.alreadyGen}</strong> document{confirmBulk.alreadyGen > 1 ? 's' : ''} déjà généré{confirmBulk.alreadyGen > 1 ? 's' : ''}.
+              {confirmBulk.pending > 0 && <> {confirmBulk.pending} en attente.</>}
+            </p>
+            <p style={{ color: '#888', fontSize: '13px', marginBottom: '20px' }}>Régénérer remplacera les fichiers déjà téléchargés.</p>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button onClick={() => setConfirmBulk(null)}
+                style={{ flex: '1 1 100px', padding: '12px', background: '#f5f5f5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                Annuler
+              </button>
+              {confirmBulk.pending > 0 && (
+                <button onClick={() => { const m = confirmBulk.mode; setConfirmBulk(null); handleGenerateBulk(m, false); }}
+                  style={{ flex: '1 1 100px', padding: '12px', background: '#007AFF', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                  Seulement les {confirmBulk.pending} en attente
+                </button>
+              )}
+              <button onClick={() => { const m = confirmBulk.mode; setConfirmBulk(null); handleGenerateBulk(m, true); }}
+                style={{ flex: '1 1 100px', padding: '12px', background: '#FF9500', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                Tout régénérer ({confirmBulk.alreadyGen + confirmBulk.pending})
               </button>
             </div>
           </div>
