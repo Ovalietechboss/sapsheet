@@ -10,6 +10,7 @@ interface Row {
   date: string;
   time_arrival: string;
   time_departure: string;
+  direct_hours: string;
   ik_km: number;
   notes: string;
 }
@@ -21,7 +22,7 @@ interface ClientBlock {
   rows: Row[];
 }
 
-const emptyRow = (): Row => ({ date: '', time_arrival: '', time_departure: '', ik_km: 0, notes: '' });
+const emptyRow = (): Row => ({ date: '', time_arrival: '', time_departure: '', direct_hours: '', ik_km: 0, notes: '' });
 
 const DEFAULT_IK_RATE = 0.603;
 
@@ -35,6 +36,7 @@ export default function ImportRapide({ onClose }: Props) {
   const [blocks, setBlocks] = useState<ClientBlock[]>([{
     client_id: '', description: 'Assistance à domicile', ik_rate: DEFAULT_IK_RATE, rows: [emptyRow()],
   }]);
+  const [saisieMode, setSaisieMode] = useState<'horaires' | 'duree'>('duree');
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
@@ -65,10 +67,18 @@ export default function ImportRapide({ onClose }: Props) {
     setBlocks(blocks.filter((_, i) => i !== bi));
   };
 
-  // Compter les pointages valides
+  const isRowValid = (r: Row): boolean => {
+    if (!r.date) return false;
+    if (saisieMode === 'duree') {
+      const h = parseFloat(r.direct_hours);
+      return !isNaN(h) && h > 0;
+    }
+    return !!r.time_arrival && !!r.time_departure;
+  };
+
   const validCount = blocks.reduce((s, b) => {
     if (!b.client_id) return s;
-    return s + b.rows.filter((r) => r.date && r.time_arrival && r.time_departure).length;
+    return s + b.rows.filter(isRowValid).length;
   }, 0);
 
   const handleSave = async () => {
@@ -78,14 +88,20 @@ export default function ImportRapide({ onClose }: Props) {
     try {
       for (const block of blocks) {
         if (!block.client_id) continue;
-        const client = clients.find((c) => c.id === block.client_id);
         for (const row of block.rows) {
-          if (!row.date || !row.time_arrival || !row.time_departure) continue;
+          if (!isRowValid(row)) continue;
           try {
-            const arrival = new Date(`${row.date}T${row.time_arrival}`).getTime();
-            const departure = new Date(`${row.date}T${row.time_departure}`).getTime();
-            const duration = Math.round(((departure - arrival) / (1000 * 60 * 60)) * 100) / 100;
-            if (duration <= 0) { errors++; continue; }
+            let arrival: number, departure: number, duration: number;
+            if (saisieMode === 'duree') {
+              duration = Math.round(parseFloat(row.direct_hours) * 100) / 100;
+              arrival = new Date(`${row.date}T09:00`).getTime();
+              departure = arrival + duration * 3600000;
+            } else {
+              arrival = new Date(`${row.date}T${row.time_arrival}`).getTime();
+              departure = new Date(`${row.date}T${row.time_departure}`).getTime();
+              duration = Math.round(((departure - arrival) / (1000 * 60 * 60)) * 100) / 100;
+              if (duration <= 0) { errors++; continue; }
+            }
             const ikKm = Math.max(0, row.ik_km || 0);
             const ikAmount = Math.round(ikKm * block.ik_rate * 100) / 100;
             await addTimesheet({
@@ -137,6 +153,10 @@ export default function ImportRapide({ onClose }: Props) {
     );
   }
 
+  const gridCols = saisieMode === 'duree'
+    ? '130px 100px 70px 1fr 36px'
+    : '130px 90px 90px 70px 1fr 36px';
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -147,6 +167,24 @@ export default function ImportRapide({ onClose }: Props) {
         <button onClick={onClose} style={{ padding: '8px 16px', backgroundColor: '#f5f5f5', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
           Retour
         </button>
+      </div>
+
+      {/* Toggle mode de saisie */}
+      <div style={{ display: 'flex', backgroundColor: '#f0f2f5', borderRadius: '8px', padding: '3px', marginBottom: '20px', maxWidth: '320px' }}>
+        {[
+          { id: 'duree' as const, label: 'Durée directe' },
+          { id: 'horaires' as const, label: 'Heures début/fin' },
+        ].map((m) => (
+          <button key={m.id} type="button" onClick={() => setSaisieMode(m.id)}
+            style={{
+              flex: 1, padding: '8px', border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+              backgroundColor: saisieMode === m.id ? 'white' : 'transparent',
+              color: saisieMode === m.id ? '#007AFF' : '#888',
+              boxShadow: saisieMode === m.id ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+            }}>
+            {m.label}
+          </button>
+        ))}
       </div>
 
       {blocks.map((block, bi) => (
@@ -180,19 +218,33 @@ export default function ImportRapide({ onClose }: Props) {
 
           {/* Lignes */}
           <div style={{ padding: '12px 16px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '130px 90px 90px 70px 1fr 36px', gap: '6px', marginBottom: '6px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: '6px', marginBottom: '6px' }}>
               <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#888' }}>DATE</span>
-              <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#888' }}>ARRIVÉE</span>
-              <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#888' }}>DÉPART</span>
+              {saisieMode === 'duree' ? (
+                <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#888' }}>HEURES</span>
+              ) : (
+                <>
+                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#888' }}>ARRIVÉE</span>
+                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#888' }}>DÉPART</span>
+                </>
+              )}
               <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#888' }}>IK km</span>
               <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#888' }}>NOTES</span>
               <span></span>
             </div>
             {block.rows.map((row, ri) => (
-              <div key={ri} style={{ display: 'grid', gridTemplateColumns: '130px 90px 90px 70px 1fr 36px', gap: '6px', marginBottom: '6px' }}>
+              <div key={ri} style={{ display: 'grid', gridTemplateColumns: gridCols, gap: '6px', marginBottom: '6px' }}>
                 <input type="date" value={row.date} onChange={(e) => updateRow(bi, ri, { date: e.target.value })} style={inputStyle} />
-                <input type="time" value={row.time_arrival} onChange={(e) => updateRow(bi, ri, { time_arrival: e.target.value })} style={inputStyle} />
-                <input type="time" value={row.time_departure} onChange={(e) => updateRow(bi, ri, { time_departure: e.target.value })} style={inputStyle} />
+                {saisieMode === 'duree' ? (
+                  <input type="number" step="0.25" value={row.direct_hours}
+                    onChange={(e) => updateRow(bi, ri, { direct_hours: e.target.value })}
+                    placeholder="Ex: 2.5" style={{ ...inputStyle, fontWeight: 'bold', color: '#007AFF' }} />
+                ) : (
+                  <>
+                    <input type="time" value={row.time_arrival} onChange={(e) => updateRow(bi, ri, { time_arrival: e.target.value })} style={inputStyle} />
+                    <input type="time" value={row.time_departure} onChange={(e) => updateRow(bi, ri, { time_departure: e.target.value })} style={inputStyle} />
+                  </>
+                )}
                 <input type="number" value={row.ik_km} onChange={(e) => updateRow(bi, ri, { ik_km: parseFloat(e.target.value) || 0 })} style={inputStyle} />
                 <input type="text" value={row.notes} onChange={(e) => updateRow(bi, ri, { notes: e.target.value })} placeholder="" style={inputStyle} />
                 <button onClick={() => removeRow(bi, ri)} disabled={block.rows.length <= 1}
@@ -214,7 +266,6 @@ export default function ImportRapide({ onClose }: Props) {
         + Ajouter un autre client
       </button>
 
-      {/* Bouton enregistrer */}
       <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
         <button onClick={onClose} style={{ padding: '12px 24px', backgroundColor: '#f5f5f5', border: '1px solid #ddd', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '15px' }}>
           Annuler
