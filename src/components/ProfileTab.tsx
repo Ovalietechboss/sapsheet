@@ -1,5 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuthStore, User } from '../stores/authStore';
+import { supabase } from '../lib/supabase';
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box',
@@ -12,7 +13,15 @@ export default function ProfileTab() {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+    };
+  }, [avatarPreview]);
 
   if (!user) return <p>Chargement du profil...</p>;
 
@@ -36,13 +45,34 @@ export default function ProfileTab() {
   };
 
   const handleSave = async () => {
+    if (!user) return;
     setIsSaving(true);
     try {
-      await updateUser(formData);
+      let avatarUrl: string | undefined = formData.avatar_url || undefined;
+      if (avatarFile) {
+        const ext = (avatarFile.name.split('.').pop() || 'png').toLowerCase();
+        const path = `${user.id}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(path, avatarFile, { upsert: true, contentType: avatarFile.type });
+        if (uploadError) {
+          console.error('[Storage upload] error détaillée :', uploadError);
+          throw new Error(uploadError.message || 'Upload échoué');
+        }
+        const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
+        avatarUrl = `${pub.publicUrl}?t=${Date.now()}`;
+      }
+      await updateUser({ ...formData, avatar_url: avatarUrl });
       setIsEditing(false);
+      setAvatarFile(null);
+      if (avatarPreview) {
+        URL.revokeObjectURL(avatarPreview);
+        setAvatarPreview(null);
+      }
     } catch (error) {
+      const msg = error instanceof Error ? error.message : JSON.stringify(error);
       console.error('Erreur sauvegarde', error);
-      alert('Erreur lors de la sauvegarde');
+      alert(`Erreur sauvegarde: ${msg}`);
     } finally {
       setIsSaving(false);
     }
@@ -52,11 +82,9 @@ export default function ProfileTab() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 500_000) { alert('Image trop lourde (max 500 Ko)'); return; }
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setFormData({ ...formData, avatar_url: reader.result as string });
-    };
-    reader.readAsDataURL(file);
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
   };
 
   const initials = (user.first_name || user.display_name || 'U').charAt(0).toUpperCase();
@@ -128,15 +156,19 @@ export default function ProfileTab() {
 
         {/* Avatar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '24px', padding: '20px', background: 'white', borderRadius: '12px', border: '1px solid #eee' }}>
-          <Avatar url={formData.avatar_url} size={80} />
+          <Avatar url={avatarPreview || formData.avatar_url} size={80} />
           <div>
             <input type="file" ref={fileInputRef} accept="image/*" onChange={handleAvatarChange} style={{ display: 'none' }} />
             <button type="button" onClick={() => fileInputRef.current?.click()}
               style={{ padding: '8px 16px', backgroundColor: '#007AFF', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', marginBottom: '6px' }}>
               Changer la photo
             </button>
-            {formData.avatar_url && (
-              <button type="button" onClick={() => setFormData({ ...formData, avatar_url: '' })}
+            {(formData.avatar_url || avatarPreview) && (
+              <button type="button" onClick={() => {
+                setFormData({ ...formData, avatar_url: '' });
+                setAvatarFile(null);
+                if (avatarPreview) { URL.revokeObjectURL(avatarPreview); setAvatarPreview(null); }
+              }}
                 style={{ marginLeft: '8px', padding: '8px 16px', backgroundColor: '#f5f5f5', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>
                 Supprimer
               </button>
