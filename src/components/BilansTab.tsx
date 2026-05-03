@@ -7,7 +7,7 @@ import { useClientStore, ClientContact } from '../stores/clientStore.supabase';
 import { useMandataireStore, Mandataire } from '../stores/mandataireStore.supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useBillingPeriodStore, BillingPeriod, ClientDocStatus } from '../stores/billingPeriodStore.supabase';
-import { generateCESUTemplate, generateClassicalTemplate } from '../services/InvoiceTemplates';
+import { generateCESUTemplate, generateClassicalTemplate, generateRecapTemplate } from '../services/InvoiceTemplates';
 import { generateAndSharePDF } from '../utils/pdfGenerator';
 import { isDureeDirecte } from '../utils/timesheetMode';
 
@@ -21,7 +21,7 @@ const STATUS_COLOR: Record<ClientDocStatus, string> = { pending: '#FF9500', gene
 const PERIOD_STATUS_LABEL = { open: 'Ouvert', locked: 'Clôturé', archived: 'Archivé' };
 const PERIOD_STATUS_COLOR = { open: '#34C759', locked: '#FF9500', archived: '#888' };
 
-type SubView = 'documents' | 'chronologie';
+type SubView = 'documents' | 'chronologie' | 'synthese';
 
 interface ClientRow {
   clientId: string;
@@ -217,6 +217,32 @@ export default function BilansTab() {
       setBulkProgress({ done: i + 1, total: targets.length, mode });
     }
     setBulkProgress(null);
+  };
+
+  const handleExportRecap = async () => {
+    if (totalClientsActive === 0 || !user || !userProfile) return;
+    setGenerating('recap');
+    try {
+      const filename = `Recap_${selectedYear}_${String(selectedMonth).padStart(2, '0')}`;
+      const html = generateRecapTemplate({
+        month: selectedMonth,
+        year: selectedYear,
+        groups,
+        totals: {
+          hours: totalHours,
+          earnings: totalEarnings,
+          frais: totalFrais,
+          amount: totalMontant,
+          clientCount: totalClientsActive,
+        },
+        user: userProfile,
+      });
+      await generateAndSharePDF(html, filename);
+    } catch (err) {
+      console.error('Export récap échoué:', err);
+    } finally {
+      setGenerating(null);
+    }
   };
 
   const startBulk = (mode: 'CESU' | 'CLASSICAL') => {
@@ -423,6 +449,7 @@ export default function BilansTab() {
         {([
           { id: 'documents' as SubView, label: `Documents (${totalClientsActive})` },
           { id: 'chronologie' as SubView, label: `Chronologie (${monthTimesheets.length})` },
+          { id: 'synthese' as SubView, label: `Synthèse` },
         ]).map((tab) => (
           <button key={tab.id} onClick={() => setSubView(tab.id)}
             style={{
@@ -591,6 +618,78 @@ export default function BilansTab() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ══════ VUE SYNTHESE ══════ */}
+      {subView === 'synthese' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+            <h3 style={{ margin: 0, fontSize: '16px', color: '#333' }}>Synthèse {MONTHS[selectedMonth - 1]} {selectedYear}</h3>
+            <button onClick={handleExportRecap} disabled={totalClientsActive === 0 || generating === 'recap'}
+              style={{ padding: '10px 20px', backgroundColor: (totalClientsActive === 0 || generating === 'recap') ? '#ccc' : '#5b3db5', color: 'white', border: 'none', borderRadius: '8px', cursor: (totalClientsActive === 0 || generating === 'recap') ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 'bold' }}>
+              {generating === 'recap' ? 'Export…' : 'Exporter récap PDF'}
+            </button>
+          </div>
+
+          {totalClientsActive === 0 ? (
+            <div style={{ background: '#f9f9f9', padding: '40px', borderRadius: '10px', textAlign: 'center', color: '#999' }}>
+              Aucun pointage pour {MONTHS[selectedMonth - 1]} {selectedYear}
+            </div>
+          ) : (
+            <div style={{ background: 'white', borderRadius: '12px', overflow: 'hidden', border: '1px solid #eee' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f5f5f5' }}>
+                    <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: '600', color: '#666', borderBottom: '2px solid #ddd' }}>Client</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center', fontWeight: '600', color: '#666', borderBottom: '2px solid #ddd' }}>Mode</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'right', fontWeight: '600', color: '#666', borderBottom: '2px solid #ddd' }}>Heures</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'right', fontWeight: '600', color: '#666', borderBottom: '2px solid #ddd' }}>Salaire</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'right', fontWeight: '600', color: '#666', borderBottom: '2px solid #ddd' }}>Frais</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'right', fontWeight: '600', color: '#666', borderBottom: '2px solid #ddd' }}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groups.map((group) => {
+                    const activeRows = group.clients.filter((r) => r.timesheetCount > 0);
+                    if (activeRows.length === 0) return null;
+                    return (
+                      <React.Fragment key={group.mandataire?.id || '__none__'}>
+                        {group.mandataire && (
+                          <tr style={{ background: '#E8F4FF' }}>
+                            <td colSpan={6} style={{ padding: '8px 14px', fontWeight: 'bold', color: '#1a6fb5', fontSize: '12px' }}>
+                              {[group.mandataire.titre, group.mandataire.first_name, group.mandataire.name].filter(Boolean).join(' ')} — {group.mandataire.association_name}
+                            </td>
+                          </tr>
+                        )}
+                        {activeRows.map((row) => (
+                          <tr key={row.clientId} style={{ borderBottom: '1px solid #eee' }}>
+                            <td style={{ padding: '10px 14px', fontWeight: '500' }}>{row.clientName}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                              <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '10px', fontWeight: '700', backgroundColor: row.facturationMode === 'CESU' ? '#EBF9F0' : '#E8F4FF', color: row.facturationMode === 'CESU' ? '#2d8a4e' : '#1a6fb5' }}>
+                                {row.facturationMode === 'CESU' ? 'CESU' : 'CLASS.'}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right' }}>{row.totalHours.toFixed(2)}h</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right' }}>{row.totalEarnings.toFixed(2)}€</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right' }}>{row.totalFrais > 0 ? `${row.totalFrais.toFixed(2)}€` : '—'}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: '600' }}>{row.totalAmount.toFixed(2)}€</td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
+                    );
+                  })}
+                  <tr style={{ backgroundColor: '#5b3db5', color: 'white', fontWeight: 'bold' }}>
+                    <td colSpan={2} style={{ padding: '14px', fontSize: '14px' }}>TOTAUX — {totalClientsActive} client{totalClientsActive > 1 ? 's' : ''}</td>
+                    <td style={{ padding: '14px', textAlign: 'right' }}>{totalHours.toFixed(2)}h</td>
+                    <td style={{ padding: '14px', textAlign: 'right' }}>{totalEarnings.toFixed(2)}€</td>
+                    <td style={{ padding: '14px', textAlign: 'right' }}>{totalFrais.toFixed(2)}€</td>
+                    <td style={{ padding: '14px', textAlign: 'right', fontSize: '15px' }}>{totalMontant.toFixed(2)}€</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

@@ -414,3 +414,148 @@ export const generateClassicalTemplate = (
 </body>
 </html>`;
 };
+
+interface RecapRow {
+  clientName: string;
+  facturationMode: 'CESU' | 'CLASSICAL';
+  timesheetCount: number;
+  totalHours: number;
+  totalEarnings: number;
+  totalFrais: number;
+  totalAmount: number;
+}
+
+interface RecapGroup {
+  mandataire?: { titre?: string; first_name?: string; name: string; association_name: string };
+  clients: RecapRow[];
+}
+
+export const generateRecapTemplate = (params: {
+  month: number;
+  year: number;
+  groups: RecapGroup[];
+  totals: { hours: number; earnings: number; frais: number; amount: number; clientCount: number };
+  user: User;
+}): string => {
+  const { month, year, groups, totals, user } = params;
+  const monthLabel = `${MOIS_FR[month - 1]} ${year}`;
+
+  const tdBase = 'padding: 8px 10px; border-bottom: 1px solid #eee; color: #000;';
+  const groupsHTML = groups.map((group) => {
+    const activeRows = group.clients.filter((r) => r.timesheetCount > 0);
+    if (activeRows.length === 0) return '';
+    const mandataireRow = group.mandataire ? `
+      <tr style="background:#F0EBFF;">
+        <td colspan="6" style="padding:6px 10px; font-weight:bold; color:#5b3db5; font-size:11px;">
+          ${[group.mandataire.titre, group.mandataire.first_name, group.mandataire.name].filter(Boolean).join(' ')} — ${group.mandataire.association_name}
+        </td>
+      </tr>
+    ` : '';
+    const rowsHTML = activeRows.map((row) => `
+      <tr>
+        <td style="${tdBase}">${row.clientName}</td>
+        <td style="${tdBase} text-align:center;">${row.facturationMode === 'CESU' ? 'CESU' : 'CLASS.'}</td>
+        <td style="${tdBase} text-align:right;">${row.totalHours.toFixed(2)}h</td>
+        <td style="${tdBase} text-align:right;">${row.totalEarnings.toFixed(2)}€</td>
+        <td style="${tdBase} text-align:right;">${row.totalFrais > 0 ? row.totalFrais.toFixed(2) + '€' : '-'}</td>
+        <td style="${tdBase} text-align:right; font-weight:bold;">${row.totalAmount.toFixed(2)}€</td>
+      </tr>
+    `).join('');
+    return mandataireRow + rowsHTML;
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 12px; color: #000; padding: 30px; }
+    p, span, td, div { color: #000; }
+    .header { border-bottom: 3px solid #5b3db5; padding-bottom: 16px; margin-bottom: 20px; overflow: hidden; }
+    .header-left { float: left; width: 65%; }
+    .header-left .badge { display: inline-block; background: #5b3db5; color: white; padding: 4px 12px; border-radius: 4px; font-weight: bold; font-size: 11px; margin-bottom: 6px; }
+    .header-left h1 { font-size: 22px; color: #222; margin-bottom: 4px; }
+    .header-left p { color: #666; font-size: 12px; }
+    .header-right { float: right; text-align: right; width: 30%; font-size: 12px; color: #555; }
+    .info-box { padding: 12px; background: #f9f9f9; border-radius: 4px; border-left: 3px solid #5b3db5; margin-bottom: 20px; clear: both; }
+    .info-box p { font-size: 12px; margin-bottom: 2px; color: #000; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th { background: #5b3db5; color: white; padding: 8px 10px; text-align: left; font-size: 11px; }
+    .totals { background: #5b3db5; color: white; font-weight: bold; }
+    .totals td { padding: 12px 10px; color: white; }
+    .recap { overflow: hidden; margin: 20px 0; }
+    .recap-card { width: 23%; float: left; margin-right: 2%; padding: 12px; border-radius: 6px; text-align: center; }
+    .recap-card:last-child { margin-right: 0; }
+    .recap-card .label { font-size: 10px; text-transform: uppercase; opacity: 0.85; margin-bottom: 4px; }
+    .recap-card .value { font-size: 18px; font-weight: bold; }
+    .footer { border-top: 1px solid #ddd; padding-top: 12px; font-size: 10px; color: #888; clear: both; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <div class="badge">RECAP MENSUEL</div>
+      <h1>${monthLabel}</h1>
+      <p>Édité le ${new Date().toLocaleDateString('fr-FR')}</p>
+    </div>
+    <div class="header-right">
+      <p style="font-weight:bold; font-size:13px; color:#5b3db5;">${user.displayName}</p>
+      ${user.cesuNumber ? `<p>N° CESU : ${user.cesuNumber}</p>` : ''}
+      ${user.siren ? `<p>SIREN : ${user.siren}</p>` : ''}
+    </div>
+  </div>
+
+  <div class="info-box">
+    <p><strong>Synthèse de l'activité — ${totals.clientCount} client${totals.clientCount > 1 ? 's' : ''} · ${totals.hours.toFixed(2)}h travaillées</strong></p>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Client</th>
+        <th style="text-align:center;">Mode</th>
+        <th style="text-align:right;">Heures</th>
+        <th style="text-align:right;">Salaire</th>
+        <th style="text-align:right;">Frais</th>
+        <th style="text-align:right;">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${groupsHTML}
+      <tr class="totals">
+        <td colspan="2">TOTAUX MOIS</td>
+        <td style="text-align:right;">${totals.hours.toFixed(2)}h</td>
+        <td style="text-align:right;">${totals.earnings.toFixed(2)}€</td>
+        <td style="text-align:right;">${totals.frais.toFixed(2)}€</td>
+        <td style="text-align:right; font-size:13px;">${totals.amount.toFixed(2)}€</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="recap">
+    <div class="recap-card" style="background:#EBF9F0; color:#2d8a4e;">
+      <div class="label">Heures</div>
+      <div class="value">${totals.hours.toFixed(1)}h</div>
+    </div>
+    <div class="recap-card" style="background:#E8F4FF; color:#1a6fb5;">
+      <div class="label">Clients</div>
+      <div class="value">${totals.clientCount}</div>
+    </div>
+    <div class="recap-card" style="background:#FFF4E5; color:#b36b00;">
+      <div class="label">Frais</div>
+      <div class="value">${totals.frais.toFixed(0)}€</div>
+    </div>
+    <div class="recap-card" style="background:#F0EBFF; color:#5b3db5;">
+      <div class="label">Total</div>
+      <div class="value">${totals.amount.toFixed(0)}€</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>Document interne — non destiné à un client. Récapitulatif mensuel pour comptabilité personnelle et déclaration NOVA.</p>
+    <p style="margin-top:8px; text-align:center; font-style:italic;">Généré par DomiTemps</p>
+  </div>
+</body>
+</html>`;
+};
