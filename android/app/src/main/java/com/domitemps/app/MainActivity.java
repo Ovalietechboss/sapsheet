@@ -1,4 +1,4 @@
-package com.sapsheet.app;
+package com.domitemps.app;
 
 import com.getcapacitor.BridgeActivity;
 
