@@ -450,7 +450,13 @@ export const generateRecapTemplate = (params: {
           ${[group.mandataire.titre, group.mandataire.first_name, group.mandataire.name].filter(Boolean).join(' ')} — ${group.mandataire.association_name}
         </td>
       </tr>
-    ` : '';
+    ` : `
+      <tr style="background:#f5f5f5;">
+        <td colspan="6" style="padding:6px 10px; font-weight:bold; color:#666; font-size:11px; text-transform:uppercase; letter-spacing:0.4px;">
+          Sans mandataire
+        </td>
+      </tr>
+    `;
     const rowsHTML = activeRows.map((row) => `
       <tr>
         <td style="${tdBase}">${row.clientName}</td>

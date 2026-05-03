@@ -67,6 +67,7 @@ export default function BilansTab() {
   const [showNova, setShowNova] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; mode: 'CESU' | 'CLASSICAL' } | null>(null);
   const [confirmBulk, setConfirmBulk] = useState<{ mode: 'CESU' | 'CLASSICAL'; alreadyGen: number; pending: number } | null>(null);
+  const [detailClient, setDetailClient] = useState<ClientRow | null>(null);
 
   const years = Array.from({ length: 5 }, (_, i) => currentDate.getFullYear() - 3 + i).reverse();
 
@@ -495,12 +496,15 @@ export default function BilansTab() {
                   const color = isCESU ? '#34C759' : '#007AFF';
                   return (
                     <div key={row.clientId} style={{ padding: '14px 16px', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', opacity: row.timesheetCount === 0 ? 0.45 : 1 }}>
-                      <div style={{ flex: 1 }}>
+                      <div style={{ flex: 1, cursor: row.timesheetCount > 0 ? 'pointer' : 'default' }}
+                        onClick={() => row.timesheetCount > 0 && setDetailClient(row)}
+                        title={row.timesheetCount > 0 ? 'Voir le détail des pointages' : ''}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '2px' }}>
                           <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{row.clientName}</span>
                           <span style={{ fontSize: '10px', fontWeight: '700', padding: '1px 7px', borderRadius: '10px', backgroundColor: isCESU ? '#EBF9F0' : '#E8F4FF', color, border: `1px solid ${color}` }}>
                             {isCESU ? 'CESU' : 'CLASSIQUE'}
                           </span>
+                          {row.timesheetCount > 0 && <span style={{ fontSize: '10px', color: '#888' }}>↗ détail</span>}
                         </div>
                         <div style={{ fontSize: '12px', color: '#888' }}>
                           {row.timesheetCount === 0 ? 'Aucun pointage ce mois' :
@@ -663,7 +667,10 @@ export default function BilansTab() {
                           </tr>
                         )}
                         {activeRows.map((row) => (
-                          <tr key={row.clientId} style={{ borderBottom: '1px solid #eee' }}>
+                          <tr key={row.clientId} style={{ borderBottom: '1px solid #eee', cursor: 'pointer' }}
+                            onClick={() => setDetailClient(row)}
+                            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#fafafa')}
+                            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}>
                             <td style={{ padding: '10px 14px', fontWeight: '500' }}>{row.clientName}</td>
                             <td style={{ padding: '10px 14px', textAlign: 'center' }}>
                               <span style={{ padding: '2px 8px', borderRadius: '10px', fontSize: '10px', fontWeight: '700', backgroundColor: row.facturationMode === 'CESU' ? '#EBF9F0' : '#E8F4FF', color: row.facturationMode === 'CESU' ? '#2d8a4e' : '#1a6fb5' }}>
@@ -716,6 +723,67 @@ export default function BilansTab() {
           </div>
         </div>
       )}
+
+      {/* Modal détail pointages d'un client */}
+      {detailClient && (() => {
+        const clientTs = monthTimesheets.filter((ts) => ts.client_id === detailClient.clientId);
+        return (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }} onClick={() => setDetailClient(null)}>
+            <div style={{ background: 'white', padding: '24px 28px', borderRadius: '12px', width: '92%', maxWidth: '640px', maxHeight: '85vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px', flexWrap: 'wrap', gap: '8px' }}>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '19px' }}>{detailClient.clientName}</h2>
+                  <p style={{ margin: '2px 0 0', color: '#888', fontSize: '13px' }}>
+                    {MONTHS[selectedMonth - 1]} {selectedYear} · {detailClient.timesheetCount} pointage{detailClient.timesheetCount > 1 ? 's' : ''} · {detailClient.totalHours.toFixed(2)}h · {detailClient.totalAmount.toFixed(2)}€
+                  </p>
+                </div>
+                <span style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', backgroundColor: detailClient.facturationMode === 'CESU' ? '#EBF9F0' : '#E8F4FF', color: detailClient.facturationMode === 'CESU' ? '#2d8a4e' : '#1a6fb5' }}>
+                  {detailClient.facturationMode === 'CESU' ? 'CESU' : 'CLASSIQUE'}
+                </span>
+              </div>
+
+              <div style={{ marginTop: '18px', display: 'grid', gap: '6px' }}>
+                {clientTs.map((ts) => {
+                  const fraisJour = (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + Math.max(0, ts.ik_amount || 0);
+                  return (
+                    <div key={ts.id} style={{ background: '#f9f9fb', padding: '10px 14px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', borderLeft: ts.status === 'validated' ? '3px solid #34C759' : '3px solid #FF9500' }}>
+                      <div style={{ flex: 1, minWidth: '180px' }}>
+                        <div style={{ fontSize: '13px', color: '#333', fontWeight: '500' }}>
+                          {formatDate(ts.date_arrival)}
+                          {!isDureeDirecte(ts) && <span style={{ color: '#666' }}> · {formatTime(ts.date_arrival)} → {formatTime(ts.date_departure)}</span>}
+                        </div>
+                        {ts.description && <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>{ts.description}</div>}
+                        {fraisJour > 0 && (
+                          <div style={{ fontSize: '11px', color: '#b36b00', marginTop: '2px' }}>
+                            Frais : {fraisJour.toFixed(2)}€
+                            {(ts.ik_amount || 0) > 0 && ` · IK ${(ts.ik_amount || 0).toFixed(2)}€`}
+                            {(ts.frais_repas || 0) > 0 && ` · Repas ${ts.frais_repas.toFixed(2)}€`}
+                            {(ts.frais_transport || 0) > 0 && ` · Transport ${ts.frais_transport.toFixed(2)}€`}
+                            {(ts.frais_autres || 0) > 0 && ` · Autres ${ts.frais_autres.toFixed(2)}€`}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#007AFF' }}>{ts.duration.toFixed(2)}h</div>
+                        <div style={{ fontSize: '10px', color: ts.status === 'validated' ? '#2d8a4e' : '#b36b00', fontWeight: '600', textTransform: 'uppercase' }}>
+                          {ts.status === 'validated' ? 'Validé' : 'Brouillon'}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ marginTop: '18px', display: 'flex', justifyContent: 'flex-end' }}>
+                <button onClick={() => setDetailClient(null)}
+                  style={{ padding: '10px 22px', background: '#007AFF', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal confirmation régénération en masse */}
       {confirmBulk && (
