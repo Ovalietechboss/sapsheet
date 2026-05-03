@@ -3,6 +3,7 @@ import { useTimesheetStore, Timesheet } from '../stores/timesheetStore.supabase'
 import { useClientStore } from '../stores/clientStore.supabase';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { isDureeDirecte } from '../utils/timesheetMode';
+import ClientCombobox from './ClientCombobox';
 import ImportRapide from './ImportRapide';
 
 const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
@@ -279,12 +280,13 @@ export default function TimesheetsTab() {
             <form onSubmit={handleSubmit}>
               <div style={{ marginBottom: '14px' }}>
                 <label style={labelStyle}>Client *</label>
-                <select value={formData.client_id} onChange={(e) => setFormData({ ...formData, client_id: e.target.value })} required style={inputStyle}>
-                  <option value="">— Sélectionner un client —</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>{[c.titre, c.first_name, c.name].filter(Boolean).join(' ')}</option>
-                  ))}
-                </select>
+                <ClientCombobox
+                  clients={clients}
+                  value={formData.client_id}
+                  onChange={(id) => setFormData({ ...formData, client_id: id })}
+                  required
+                  inputStyle={inputStyle}
+                />
               </div>
               {/* Toggle mode de saisie */}
               <div style={{ display: 'flex', backgroundColor: '#f0f2f5', borderRadius: '8px', padding: '3px', marginBottom: '14px' }}>

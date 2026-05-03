@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTimesheetStore } from '../stores/timesheetStore.supabase';
 import { useClientStore } from '../stores/clientStore.supabase';
+import ClientCombobox from './ClientCombobox';
 
 const inputStyle: React.CSSProperties = {
   padding: '8px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box',
@@ -193,11 +194,12 @@ export default function ImportRapide({ onClose }: Props) {
           <div style={{ background: '#f9f9f9', padding: '14px 16px', display: 'flex', gap: '10px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: '180px' }}>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>Client *</label>
-              <select value={block.client_id} onChange={(e) => updateBlock(bi, { client_id: e.target.value })}
-                style={{ ...inputStyle, width: '100%' }}>
-                <option value="">— Sélectionner —</option>
-                {clients.map((c) => <option key={c.id} value={c.id}>{getClientLabel(c)}</option>)}
-              </select>
+              <ClientCombobox
+                clients={clients}
+                value={block.client_id}
+                onChange={(id) => updateBlock(bi, { client_id: id })}
+                inputStyle={{ ...inputStyle, width: '100%' }}
+              />
             </div>
             <div style={{ flex: 1, minWidth: '180px' }}>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>Prestation</label>

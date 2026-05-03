@@ -24,6 +24,7 @@ export default function ClientsTab() {
   const { mandataires, addMandataire, updateMandataire, deleteMandataire } = useMandataireStore();
 
   const [subTab, setSubTab] = useState<'clients' | 'mandataires'>('clients');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // ── Modals ──────────────────────────────────────────────────────────────
   const [clientModal, setClientModal] = useState<'create' | 'edit' | null>(null);
@@ -141,8 +142,16 @@ export default function ClientsTab() {
   const getMandataire = (id?: string) =>
     id ? mandataires.find((m) => m.id === id) : undefined;
 
-  const cesuClients = clients.filter((c) => c.facturation_mode === 'CESU');
-  const classicalClients = clients.filter((c) => c.facturation_mode === 'CLASSICAL');
+  const q = searchQuery.trim().toLowerCase();
+  const matchClient = (c: Client) =>
+    !q || fullName(c.titre, c.first_name, c.name).toLowerCase().includes(q);
+  const matchMandataire = (m: Mandataire) =>
+    !q || fullName(m.titre, m.first_name, m.name).toLowerCase().includes(q)
+       || (m.association_name || '').toLowerCase().includes(q);
+
+  const cesuClients = clients.filter((c) => c.facturation_mode === 'CESU' && matchClient(c));
+  const classicalClients = clients.filter((c) => c.facturation_mode === 'CLASSICAL' && matchClient(c));
+  const filteredMandataires = mandataires.filter(matchMandataire);
 
   // ═══════════════════════════════════════════════════════════════════════
   //  Rendu
@@ -179,6 +188,27 @@ export default function ClientsTab() {
         </button>
       </div>
 
+      {/* Recherche */}
+      <div style={{ position: 'relative', marginBottom: '20px' }}>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={subTab === 'clients' ? 'Rechercher un client…' : 'Rechercher un mandataire (nom ou association)…'}
+          style={{ ...inputStyle, paddingRight: searchQuery ? '36px' : '10px' }}
+        />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => setSearchQuery('')}
+            style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#888', padding: '0 4px' }}
+            aria-label="Effacer"
+          >
+            ×
+          </button>
+        )}
+      </div>
+
       {/* ══════════ SOUS-TAB CLIENTS ══════════ */}
       {subTab === 'clients' && (
         <>
@@ -210,8 +240,8 @@ export default function ClientsTab() {
       {/* ══════════ SOUS-TAB MANDATAIRES ══════════ */}
       {subTab === 'mandataires' && (
         <div style={{ display: 'grid', gap: '14px' }}>
-          {mandataires.length === 0 && <p style={{ color: '#999', textAlign: 'center', marginTop: '40px' }}>Aucun mandataire</p>}
-          {mandataires.map((m) => {
+          {filteredMandataires.length === 0 && <p style={{ color: '#999', textAlign: 'center', marginTop: '40px' }}>{q ? 'Aucun mandataire trouvé' : 'Aucun mandataire'}</p>}
+          {filteredMandataires.map((m) => {
             const linkedClients = getClientsForMandataire(m.id);
             return (
               <div key={m.id} style={{ backgroundColor: 'white', padding: '18px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #e0e0e0' }}>
