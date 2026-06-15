@@ -286,7 +286,7 @@ export default function BilansTab() {
         await addInvoice({
           invoice_number: invoiceNumber,
           client_id: client.id,
-          status: 'sent',
+          status: 'draft', // créée mais non envoyée → à valider/envoyer depuis l'onglet Factures
           total_amount: total,
           month: invMonth,
           year: invYear,
@@ -963,13 +963,13 @@ export default function BilansTab() {
               <span style={{ fontSize: '13px', color: '#555', fontWeight: 'bold' }}>Total HT</span>
               <span style={{ fontSize: '22px', fontWeight: 'bold' }}>{societeTotal.toFixed(2)} €</span>
             </div>
-            <p style={{ fontSize: '11px', color: '#999', textAlign: 'right', margin: '0 0 18px' }}>TVA non applicable, art. 293 B du CGI · mentions B2B incluses sur le PDF</p>
+            <p style={{ fontSize: '11px', color: '#999', textAlign: 'right', margin: '0 0 18px' }}>TVA non applicable, art. 293 B du CGI · mentions B2B incluses sur le PDF · créée en brouillon (non envoyée)</p>
 
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={() => setSocieteModal(null)} style={{ flex: 1, padding: '12px', background: '#f5f5f5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Annuler</button>
               <button onClick={handleGenerateSociete} disabled={generating === societeModal.clientId}
                 style={{ flex: 1, padding: '12px', background: generating === societeModal.clientId ? '#ccc' : '#5856D6', color: 'white', border: 'none', borderRadius: '8px', cursor: generating === societeModal.clientId ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>
-                {generating === societeModal.clientId ? 'Génération…' : 'Générer la facture'}
+                {generating === societeModal.clientId ? 'Génération…' : 'Générer (brouillon)'}
               </button>
             </div>
           </div>
