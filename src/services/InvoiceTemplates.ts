@@ -361,8 +361,9 @@ export const generateClassicalTemplate = (
 <body>
 
   <div class="header">
-    <h1>Facture ${invoice.invoice_number}</h1>
+    <h1>${invoice.credit_of ? 'Avoir' : 'Facture'} ${invoice.invoice_number}</h1>
     <p class="date">${formatDate(invoice.created_at)}</p>
+    ${invoice.credit_of ? `<p class="date">Avoir sur facture ${invoice.credit_of}</p>` : ''}
   </div>
 
   <div class="cols">

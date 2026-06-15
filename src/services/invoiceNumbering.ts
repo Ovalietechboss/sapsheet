@@ -28,3 +28,23 @@ export function nextInvoiceNumber(
   }
   return `${year}-${String(max + 1).padStart(3, '0')}`;
 }
+
+/**
+ * Numérotation des AVOIRS — série annuelle dédiée `AV-AAAA-NNN`, gap-safe (max+1).
+ * Distincte de la série factures pour ne pas perturber sa continuité.
+ */
+export function nextCreditNumber(
+  invoices: ReadonlyArray<{ invoice_number?: string | null }>,
+  year: number,
+): string {
+  const re = new RegExp(`^AV-${year}-(\\d+)$`);
+  let max = 0;
+  for (const inv of invoices) {
+    const m = inv.invoice_number?.match(re);
+    if (m) {
+      const seq = parseInt(m[1], 10);
+      if (Number.isFinite(seq) && seq > max) max = seq;
+    }
+  }
+  return `AV-${year}-${String(max + 1).padStart(3, '0')}`;
+}

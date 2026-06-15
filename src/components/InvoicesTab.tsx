@@ -4,7 +4,7 @@ import { useTimesheetStore } from '../stores/timesheetStore.supabase';
 import { useClientStore } from '../stores/clientStore.supabase';
 import { useAuthStore } from '../stores/authStore';
 import { generateCESUTemplate, generateClassicalTemplate } from '../services/InvoiceTemplates';
-import { nextInvoiceNumber } from '../services/invoiceNumbering';
+import { nextInvoiceNumber, nextCreditNumber } from '../services/invoiceNumbering';
 import { generateAndSharePDF } from '../utils/pdfGenerator';
 import InvoiceImportPanel from './InvoiceImportPanel';
 
@@ -16,6 +16,50 @@ export default function InvoicesTab() {
   const [showModal, setShowModal] = useState(false);
   const [selectedTimesheets, setSelectedTimesheets] = useState<string[]>([]);
   const [selectedMode, setSelectedMode] = useState<'CESU' | 'CLASSICAL'>('CESU');
+  // Avoir (note de crédit) sur une facture existante
+  const [creditModal, setCreditModal] = useState<any | null>(null);
+  const [creditForm, setCreditForm] = useState({ amount: '', reason: '', date: '' });
+  const [creatingCredit, setCreatingCredit] = useState(false);
+
+  const openCreditModal = (invoice: any) => {
+    const today = new Date();
+    setCreditForm({
+      amount: Math.abs(invoice.total_amount || 0).toFixed(2),
+      reason: `Avoir sur facture ${invoice.invoice_number}`,
+      date: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`,
+    });
+    setCreditModal(invoice);
+  };
+
+  const handleCreateCredit = async () => {
+    if (!creditModal) return;
+    const amount = parseFloat(creditForm.amount);
+    if (!Number.isFinite(amount) || amount <= 0) { alert('Montant de l\'avoir invalide.'); return; }
+    const dateMs = creditForm.date ? new Date(creditForm.date).getTime() : Date.now();
+    const d = new Date(dateMs);
+    const number = nextCreditNumber(invoices, d.getFullYear());
+    setCreatingCredit(true);
+    try {
+      await addInvoice({
+        invoice_number: number,
+        client_id: creditModal.client_id,
+        status: 'sent',
+        total_amount: -Math.abs(amount), // avoir = montant négatif
+        month: d.getMonth() + 1,
+        year: d.getFullYear(),
+        lines: [{ designation: creditForm.reason || `Avoir sur facture ${creditModal.invoice_number}`, quantity: 1, unit_price: -Math.abs(amount) }],
+        credit_of: creditModal.invoice_number,
+        generated_at: dateMs,
+        facturation_mode: creditModal.facturation_mode || 'CLASSICAL',
+      } as any);
+      setCreditModal(null);
+    } catch (e: any) {
+      console.error('Création avoir échouée:', e);
+      alert(`Échec de la création de l'avoir : ${e?.message || e}`);
+    } finally {
+      setCreatingCredit(false);
+    }
+  };
 
   // Filter unbilled timesheets (all timesheets are unbilled by default)
   const unbilledTimesheets = timesheets;
@@ -215,7 +259,12 @@ export default function InvoicesTab() {
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px', flexWrap: 'wrap' }}>
                       <h3 style={{ margin: 0 }}>#{invoice.invoice_number}</h3>
-                      <span style={{ 
+                        {invoice.credit_of && (
+                        <span style={{ backgroundColor: '#FF3B30', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
+                          AVOIR
+                        </span>
+                      )}
+                      <span style={{
                         backgroundColor: invoice.status === 'paid' ? '#34C759' : invoice.status === 'sent' ? '#007AFF' : '#FF9500',
                         color: 'white',
                         padding: '4px 8px',
@@ -244,12 +293,17 @@ export default function InvoicesTab() {
                     <p style={{ color: '#666', marginBottom: '4px' }}>
                       📅 {formatDate(invoice.generated_at || invoice.created_at)}
                     </p>
-                    <p style={{ fontWeight: 'bold', fontSize: '18px', color: '#007AFF' }}>
+                    <p style={{ fontWeight: 'bold', fontSize: '18px', color: invoice.total_amount < 0 ? '#FF3B30' : '#007AFF' }}>
                       Total: {invoice.total_amount.toFixed(2)}€
                     </p>
+                    {invoice.credit_of && (
+                      <p style={{ color: '#FF3B30', fontSize: '12px', marginTop: '2px' }}>
+                        ↩ Avoir sur facture {invoice.credit_of}
+                      </p>
+                    )}
                     {invoice.status === 'paid' && invoice.paid_at && (
                       <p style={{ color: '#34C759', fontSize: '12px', marginTop: '4px' }}>
-                        💶 Encaissée le {formatDate(invoice.paid_at)}
+                        💶 {invoice.total_amount < 0 ? 'Remboursé' : 'Encaissée'} le {formatDate(invoice.paid_at)}
                       </p>
                     )}
                   </div>
@@ -294,6 +348,15 @@ export default function InvoicesTab() {
                         style={{ padding: '6px 8px', border: '1px solid #34C759', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' }}
                       />
                     )}
+                    {!invoice.credit_of && (
+                      <button
+                        onClick={() => openCreditModal(invoice)}
+                        title="Créer un avoir sur cette facture"
+                        style={{ padding: '8px 16px', backgroundColor: 'white', color: '#FF3B30', border: '1px solid #FF3B30', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                      >
+                        ↩ Avoir
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -301,6 +364,39 @@ export default function InvoicesTab() {
           </div>
         )}
       </div>
+
+      {/* Modal Avoir (note de crédit) */}
+      {creditModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }} onClick={() => setCreditModal(null)}>
+          <div style={{ background: 'white', padding: '28px', borderRadius: '12px', width: '92%', maxWidth: '460px' }} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ margin: '0 0 4px', fontSize: '19px' }}>Avoir sur facture {creditModal.invoice_number}</h2>
+            <p style={{ margin: '0 0 18px', color: '#888', fontSize: '13px' }}>
+              Annule/corrige une facture émise (montant crédité au client). N° dédié AV-{new Date(creditForm.date || Date.now()).getFullYear()}-NNN.
+            </p>
+
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold', fontSize: '13px' }}>Montant à créditer (€)</label>
+            <input type="number" step="0.01" value={creditForm.amount} onChange={(e) => setCreditForm({ ...creditForm, amount: e.target.value })}
+              style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box', marginBottom: '14px' }} />
+            <p style={{ fontSize: '11px', color: '#999', margin: '-10px 0 14px' }}>Total facture : {Math.abs(creditModal.total_amount || 0).toFixed(2)} € — laisser tel quel pour un avoir total, réduire pour un avoir partiel.</p>
+
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold', fontSize: '13px' }}>Motif</label>
+            <input type="text" value={creditForm.reason} onChange={(e) => setCreditForm({ ...creditForm, reason: e.target.value })}
+              placeholder="Ex: erreur de facturation, remise…" style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box', marginBottom: '14px' }} />
+
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold', fontSize: '13px' }}>Date de l'avoir</label>
+            <input type="date" value={creditForm.date} onChange={(e) => setCreditForm({ ...creditForm, date: e.target.value })}
+              style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box', marginBottom: '20px' }} />
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setCreditModal(null)} style={{ flex: 1, padding: '12px', background: '#f5f5f5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Annuler</button>
+              <button onClick={handleCreateCredit} disabled={creatingCredit}
+                style={{ flex: 1, padding: '12px', background: creatingCredit ? '#ccc' : '#FF3B30', color: 'white', border: 'none', borderRadius: '8px', cursor: creatingCredit ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>
+                {creatingCredit ? 'Création…' : "Créer l'avoir"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Generate Modal */}
       {showModal && (

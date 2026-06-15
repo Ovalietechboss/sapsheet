@@ -22,6 +22,8 @@ export interface Invoice {
   lines?: InvoiceLine[];
   /** Date d'encaissement (ms). Renseignée quand la facture passe en « payée » → base URSSAF. */
   paid_at?: number | null;
+  /** Si renseigné : ce document est un AVOIR sur la facture dont c'est le numéro (total négatif). */
+  credit_of?: string | null;
   generated_at: number;
   created_at: number;
   updated_at: number;
