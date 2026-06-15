@@ -254,7 +254,9 @@ export default function InvoicesTab() {
       if (!built) { alert('Données facture incomplètes'); return; }
       const pdfBase64 = await generatePdfBase64(built.html);
       const subject = `${isCredit ? 'Avoir' : 'Facture'} ${invoice.invoice_number}`;
-      const message = `Bonjour,\n\nVeuillez trouver ${isCredit ? "l'avoir" : 'la facture'} ${invoice.invoice_number} en pièce jointe.\n\nCordialement,\n${user?.display_name || ''}`;
+      // Signature = prénom + nom (display_name ne contient que le nom de famille).
+      const signature = [user?.first_name, user?.display_name].filter(Boolean).join(' ') || user?.business_name || '';
+      const message = `Bonjour,\n\nVeuillez trouver ${isCredit ? "l'avoir" : 'la facture'} ${invoice.invoice_number} en pièce jointe.\n\nCordialement,\n${signature}`;
       const { data, error } = await supabase.functions.invoke('send-invoice', {
         body: { to, cc, subject, message, pdfBase64, filename: `${invoice.invoice_number}.pdf` },
       });
