@@ -4,10 +4,12 @@ import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { useTimesheetStore } from '../stores/timesheetStore.supabase';
 import { useClientStore } from '../stores/clientStore.supabase';
+import { useInvoiceStore } from '../stores/invoiceStore.supabase';
 import { useMandataireStore } from '../stores/mandataireStore.supabase';
 import { useAuthStore } from '../stores/authStore';
 import { generateCESUTemplate, generateClassicalTemplate } from '../services/InvoiceTemplates';
 import { generateAndSharePDF } from '../utils/pdfGenerator';
+import { buildAttestationData, generateAttestationHtml } from '../services/attestationFiscale';
 import { isDureeDirecte } from '../utils/timesheetMode';
 
 const MONTHS = [
@@ -18,6 +20,7 @@ const MONTHS = [
 export default function ReportsTab() {
   const { timesheets } = useTimesheetStore();
   const { clients } = useClientStore();
+  const { invoices } = useInvoiceStore();
   const { mandataires } = useMandataireStore();
   const { user } = useAuthStore();
 
@@ -194,6 +197,25 @@ export default function ReportsTab() {
   const formatTime = (ts: number) =>
     new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
+  // ─── Attestation fiscale annuelle (SAP, art. D7233-4) — par client / année ───
+  const handleGenerateAttestation = async (clientId: string) => {
+    const client = clients.find((c) => c.id === clientId);
+    if (!client || !user) return;
+    setGenerating('att-' + clientId);
+    try {
+      const data = buildAttestationData({ user, client, clientId, year: selectedYear, timesheets, invoices });
+      await generateAndSharePDF(
+        generateAttestationHtml(data),
+        `attestation_fiscale_${client.name}_${selectedYear}.pdf`,
+      );
+    } catch (error) {
+      console.error('Erreur génération attestation:', error);
+      alert("Erreur lors de la génération de l'attestation");
+    } finally {
+      setGenerating(null);
+    }
+  };
+
   const formatDate = (ts: number) =>
     new Date(ts).toLocaleDateString('fr-FR');
 
@@ -250,6 +272,35 @@ export default function ReportsTab() {
           </div>
         ))}
       </div>
+
+      {/* ── Attestations fiscales annuelles (SAP, art. D7233-4) ── */}
+      {clients.filter((c) => c.facturation_mode !== 'CESU').length > 0 && (
+        <div style={{ marginBottom: '28px' }}>
+          <h3 style={{ marginBottom: '14px' }}>🧾 Attestations fiscales annuelles — {selectedYear}</h3>
+          {!user?.sap_declaration_number && (
+            <p style={{ color: '#FF9500', fontSize: '13px', margin: '0 0 10px' }}>
+              ⚠️ Renseignez votre n° de déclaration SAP dans votre profil pour une attestation complète.
+            </p>
+          )}
+          <div style={{ display: 'grid', gap: '12px' }}>
+            {clients.filter((c) => c.facturation_mode !== 'CESU').map((client) => {
+              const isGenerating = generating === 'att-' + client.id;
+              return (
+                <div key={client.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'white', border: '1px solid #eee', borderRadius: '10px', padding: '14px 16px', flexWrap: 'wrap', gap: '10px' }}>
+                  <span style={{ fontWeight: 600 }}>{[client.titre, client.first_name, client.name].filter(Boolean).join(' ')}</span>
+                  <button
+                    onClick={() => handleGenerateAttestation(client.id)}
+                    disabled={isGenerating}
+                    style={{ padding: '8px 16px', backgroundColor: isGenerating ? '#ccc' : '#5856D6', color: 'white', border: 'none', borderRadius: '6px', cursor: isGenerating ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontSize: '14px' }}
+                  >
+                    {isGenerating ? '…' : `🧾 Attestation ${selectedYear}`}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Génération des documents de fin de mois ── */}
       {monthlyData.byClient.length > 0 && (
