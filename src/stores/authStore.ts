@@ -19,6 +19,8 @@ export interface User {
   siret?: string;
   business_name?: string;
   business_address?: string;
+  sap_declaration_number?: string; // n° de déclaration SAP (récépissé préfecture, ex. SAP880186515)
+  sap_declaration_date?: string;   // date d'enregistrement de la déclaration (ex. 2020-03-14)
   iban?: string;
   bic?: string;
 }
@@ -64,6 +66,8 @@ function mapDbUser(data: Record<string, unknown>): User {
     siret: data.siret as string | undefined,
     business_name: data.business_name as string | undefined,
     business_address: data.business_address as string | undefined,
+    sap_declaration_number: data.sap_declaration_number as string | undefined,
+    sap_declaration_date: data.sap_declaration_date as string | undefined,
     iban: data.iban as string | undefined,
     bic: data.bic as string | undefined,
   };
