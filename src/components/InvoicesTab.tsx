@@ -5,13 +5,14 @@ import { useClientStore } from '../stores/clientStore.supabase';
 import { useAuthStore } from '../stores/authStore';
 import { generateCESUTemplate, generateClassicalTemplate } from '../services/InvoiceTemplates';
 import { nextInvoiceNumber, nextCreditNumber } from '../services/invoiceNumbering';
-import { generateAndSharePDF } from '../utils/pdfGenerator';
+import { generateAndSharePDF, generatePdfBase64 } from '../utils/pdfGenerator';
+import { supabase } from '../lib/supabase';
 import InvoiceImportPanel from './InvoiceImportPanel';
 
 export default function InvoicesTab() {
   const { invoices, addInvoice, updateInvoice } = useInvoiceStore();
   const { timesheets } = useTimesheetStore();
-  const { clients } = useClientStore();
+  const { clients, getContactsForClient } = useClientStore();
   const { user } = useAuthStore();
   const [showModal, setShowModal] = useState(false);
   const [selectedTimesheets, setSelectedTimesheets] = useState<string[]>([]);
@@ -21,6 +22,7 @@ export default function InvoicesTab() {
   const [creditForm, setCreditForm] = useState({ amount: '', reason: '', date: '' });
   const [creatingCredit, setCreatingCredit] = useState(false);
   const [onlyUnpaid, setOnlyUnpaid] = useState(false);
+  const [sendingId, setSendingId] = useState<string | null>(null);
 
   const openCreditModal = (invoice: any) => {
     const today = new Date();
@@ -128,12 +130,12 @@ export default function InvoicesTab() {
     return clients.find((c) => c.id === clientId)?.name || 'Unknown';
   };
 
-  const generatePDF = async (invoice: any) => {
-    try {
+  // Construit le HTML de la facture (partagé entre PDF et envoi email). null si données manquantes.
+  const buildInvoiceHtml = (invoice: any): { html: string; client: any } | null => {
+    {
       const client = clients.find((c) => c.id === invoice.client_id);
       if (!client || !user) {
-        alert('Client ou user non trouvé');
-        return;
+        return null;
       }
 
       // Filtrer les timesheets par client, année et mois de la facture
@@ -219,11 +221,56 @@ export default function InvoicesTab() {
           ? generateCESUTemplate(invoiceData, client, invoiceTimesheets, userForTemplate)
           : generateClassicalTemplate(invoiceData, client, invoiceTimesheets, userForTemplate, undefined, undefined, pdfLines);
 
-      await generateAndSharePDF(htmlContent, `invoice_${invoice.invoice_number}.pdf`);
+      return { html: htmlContent, client };
+    }
+  };
+
+  const generatePDF = async (invoice: any) => {
+    try {
+      const built = buildInvoiceHtml(invoice);
+      if (!built) { alert('Client ou user non trouvé'); return; }
+      await generateAndSharePDF(built.html, `invoice_${invoice.invoice_number}.pdf`);
     } catch (error: any) {
       console.error('Error generating PDF:', error);
       console.error('Error stack:', error?.stack);
       alert(`Erreur: ${error?.message || String(error)}`);
+    }
+  };
+
+  // FAC-07 : envoi de la facture par email (Edge Function send-invoice → Resend).
+  const sendInvoiceEmail = async (invoice: any) => {
+    const client = clients.find((c) => c.id === invoice.client_id);
+    if (!client) { alert('Client non trouvé'); return; }
+    const contacts = getContactsForClient(invoice.client_id);
+    const to = client.email || contacts[0]?.email;
+    if (!to) { alert("Aucun email destinataire (renseignez l'email du client ou un contact)."); return; }
+    const cc = contacts.map((c) => c.email).filter((e) => e && e !== to);
+    const isCredit = !!invoice.credit_of;
+    if (!window.confirm(`Envoyer ${isCredit ? "l'avoir" : 'la facture'} ${invoice.invoice_number} à ${to} ?`)) return;
+
+    setSendingId(invoice.id);
+    try {
+      const built = buildInvoiceHtml(invoice);
+      if (!built) { alert('Données facture incomplètes'); return; }
+      const pdfBase64 = await generatePdfBase64(built.html);
+      const subject = `${isCredit ? 'Avoir' : 'Facture'} ${invoice.invoice_number}`;
+      const message = `Bonjour,\n\nVeuillez trouver ${isCredit ? "l'avoir" : 'la facture'} ${invoice.invoice_number} en pièce jointe.\n\nCordialement,\n${user?.display_name || ''}`;
+      const { data, error } = await supabase.functions.invoke('send-invoice', {
+        body: { to, cc, subject, message, pdfBase64, filename: `${invoice.invoice_number}.pdf` },
+      });
+      if (error || (data && data.error)) {
+        throw new Error(error?.message || data?.error || 'Échec de l\'envoi');
+      }
+      // Marque envoyée + horodate (sauf si déjà payée, on garde le statut payé).
+      const updates: any = { sent_at: Date.now() };
+      if (invoice.status === 'draft') updates.status = 'sent';
+      await updateInvoice(invoice.id, updates);
+      alert(`Email envoyé à ${to}.`);
+    } catch (e: any) {
+      console.error('Envoi email échoué:', e);
+      alert(`Échec de l'envoi : ${e?.message || e}\n\n(La fonction send-invoice est-elle déployée et la clé Resend configurée ?)`);
+    } finally {
+      setSendingId(null);
     }
   };
 
@@ -342,6 +389,11 @@ export default function InvoicesTab() {
                         ↩ Avoir sur facture {invoice.credit_of}
                       </p>
                     )}
+                    {invoice.sent_at && (
+                      <p style={{ color: '#1a6fb5', fontSize: '12px', marginTop: '4px' }}>
+                        ✉️ Envoyée le {formatDate(invoice.sent_at)}
+                      </p>
+                    )}
                     {invoice.status === 'paid' && invoice.paid_at && (
                       <p style={{ color: '#34C759', fontSize: '12px', marginTop: '4px' }}>
                         💶 {invoice.total_amount < 0 ? 'Remboursé' : 'Encaissée'} le {formatDate(invoice.paid_at)}
@@ -362,6 +414,22 @@ export default function InvoicesTab() {
                       }}
                     >
                       📄 PDF
+                    </button>
+                    <button
+                      onClick={() => sendInvoiceEmail(invoice)}
+                      disabled={sendingId === invoice.id}
+                      title="Envoyer par email (PDF joint)"
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: sendingId === invoice.id ? '#ccc' : '#34C759',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: sendingId === invoice.id ? 'not-allowed' : 'pointer',
+                        fontSize: '12px',
+                      }}
+                    >
+                      {sendingId === invoice.id ? 'Envoi…' : '✉️ Envoyer'}
                     </button>
                     <select
                       value={invoice.status}
