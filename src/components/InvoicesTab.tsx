@@ -8,7 +8,7 @@ import { nextInvoiceNumber } from '../services/invoiceNumbering';
 import { generateAndSharePDF } from '../utils/pdfGenerator';
 
 export default function InvoicesTab() {
-  const { invoices, addInvoice } = useInvoiceStore();
+  const { invoices, addInvoice, updateInvoice } = useInvoiceStore();
   const { timesheets } = useTimesheetStore();
   const { clients } = useClientStore();
   const { user } = useAuthStore();
@@ -226,20 +226,32 @@ export default function InvoicesTab() {
                       Total: {invoice.total_amount.toFixed(2)}€
                     </p>
                   </div>
-                  <button
-                    onClick={() => generatePDF(invoice)}
-                    style={{
-                      padding: '8px 16px',
-                      backgroundColor: '#007AFF',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                    }}
-                  >
-                    📄 PDF
-                  </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'stretch' }}>
+                    <button
+                      onClick={() => generatePDF(invoice)}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: '#007AFF',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                      }}
+                    >
+                      📄 PDF
+                    </button>
+                    <select
+                      value={invoice.status}
+                      onChange={(e) => updateInvoice(invoice.id, { status: e.target.value as 'draft' | 'sent' | 'paid' })}
+                      title="Statut de la facture"
+                      style={{ padding: '6px 8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' }}
+                    >
+                      <option value="draft">Brouillon</option>
+                      <option value="sent">Envoyée</option>
+                      <option value="paid">Payée</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             ))}
