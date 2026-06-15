@@ -171,6 +171,7 @@ export default function ReportsTab() {
         businessAddress: user.business_address,
         iban: user.iban,
         bic: user.bic,
+        sapDeclarationNumber: user.sap_declaration_number,
       };
 
       const mandataire = client.mandataire_id

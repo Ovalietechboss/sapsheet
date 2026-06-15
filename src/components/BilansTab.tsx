@@ -157,6 +157,7 @@ export default function BilansTab() {
     cesuNumber: user.cesu_number, siren: user.siren, siret: user.siret,
     businessName: user.business_name, businessAddress: user.business_address,
     iban: user.iban, bic: user.bic,
+    sapDeclarationNumber: user.sap_declaration_number,
   } : null;
 
   // ── Génération PDF ─────────────────────────────────────────────────────────

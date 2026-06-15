@@ -16,6 +16,7 @@ interface User {
   businessAddress?: string;
   iban?: string;
   bic?: string;
+  sapDeclarationNumber?: string;
 }
 
 const MOIS_FR = [
@@ -351,6 +352,7 @@ export const generateClassicalTemplate = (
         <tr><td class="label">Adresse :</td><td>${user.address || ''}</td></tr>
         ${user.siret ? `<tr><td class="label">N° entreprise :</td><td>${user.siret}</td></tr>` : ''}
         ${user.siren ? `<tr><td class="label">SIREN :</td><td>${user.siren}</td></tr>` : ''}
+        ${user.sapDeclarationNumber ? `<tr><td class="label">N° déclaration SAP :</td><td>${user.sapDeclarationNumber}</td></tr>` : ''}
         ${user.phone ? `<tr><td class="label">Téléphone :</td><td>${user.phone}</td></tr>` : ''}
         <tr><td class="label">Email :</td><td>${user.email}</td></tr>
       </table>
@@ -509,6 +511,7 @@ export const generateRecapTemplate = (params: {
       <p style="font-weight:bold; font-size:13px; color:#5b3db5;">${user.displayName}</p>
       ${user.cesuNumber ? `<p>N° CESU : ${user.cesuNumber}</p>` : ''}
       ${user.siren ? `<p>SIREN : ${user.siren}</p>` : ''}
+      ${user.sapDeclarationNumber ? `<p>N° déclaration SAP : ${user.sapDeclarationNumber}</p>` : ''}
     </div>
   </div>
 

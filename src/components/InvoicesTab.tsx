@@ -153,6 +153,7 @@ export default function InvoicesTab() {
         businessAddress: user.business_address,
         iban: user.iban,
         bic: user.bic,
+        sapDeclarationNumber: user.sap_declaration_number,
       };
       const htmlContent =
         mode === 'CESU'
@@ -227,7 +228,7 @@ export default function InvoicesTab() {
                       👤 Client: {getClientName(invoice.client_id)}
                     </p>
                     <p style={{ color: '#666', marginBottom: '4px' }}>
-                      📅 {formatDate(invoice.created_at)}
+                      📅 {formatDate(invoice.generated_at || invoice.created_at)}
                     </p>
                     <p style={{ fontWeight: 'bold', fontSize: '18px', color: '#007AFF' }}>
                       Total: {invoice.total_amount.toFixed(2)}€
