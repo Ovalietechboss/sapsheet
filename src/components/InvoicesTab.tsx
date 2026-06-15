@@ -155,11 +155,24 @@ export default function InvoicesTab() {
         bic: user.bic,
         sapDeclarationNumber: user.sap_declaration_number,
       };
+      // Lignes à rendre :
+      //  - facture indépendante (société) → lignes libres stockées ;
+      //  - facture importée (reprise DomiTemps / facture.net) sans pointage ni ligne mais
+      //    avec un montant stocké → on rend UNE ligne récap au montant de la facture
+      //    (sinon le recalcul depuis des pointages inexistants affiche 0 €).
+      let pdfLines = invoice.lines as { designation: string; quantity: number; unit_price: number }[] | undefined;
+      if ((!pdfLines || pdfLines.length === 0) && invoiceTimesheets.length === 0 && (invoice.total_amount || 0) > 0) {
+        pdfLines = [{
+          designation: `Prestations ${String(invoice.month).padStart(2, '0')}/${invoice.year}`,
+          quantity: 1,
+          unit_price: invoice.total_amount,
+        }];
+      }
+
       const htmlContent =
         mode === 'CESU'
           ? generateCESUTemplate(invoiceData, client, invoiceTimesheets, userForTemplate)
-          // Facture indépendante (société) : on rejoue les lignes libres stockées plutôt que les pointages.
-          : generateClassicalTemplate(invoiceData, client, invoiceTimesheets, userForTemplate, undefined, undefined, invoice.lines);
+          : generateClassicalTemplate(invoiceData, client, invoiceTimesheets, userForTemplate, undefined, undefined, pdfLines);
 
       await generateAndSharePDF(htmlContent, `invoice_${invoice.invoice_number}.pdf`);
     } catch (error: any) {
