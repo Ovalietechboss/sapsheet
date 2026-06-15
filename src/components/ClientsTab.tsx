@@ -81,7 +81,8 @@ export default function ClientsTab() {
         facturation_mode: isSociete ? 'CLASSICAL' as const : clientForm.facturation_mode,
         company_siret: isSociete ? (clientForm.company_siret || undefined) : undefined,
         company_vat: isSociete ? (clientForm.company_vat || undefined) : undefined,
-        hourly_rate: clientForm.hourly_rate,
+        // Société : facture indépendante (pas de taux horaire / pointage) → 0.
+        hourly_rate: isSociete ? 0 : clientForm.hourly_rate,
         // Société : pas de mandataire (B2B direct).
         mandataire_id: isSociete ? undefined : (clientForm.mandataire_id || undefined),
         observations: clientForm.observations || undefined,
@@ -400,10 +401,12 @@ export default function ClientsTab() {
               </select>
             </div>
           )}
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Taux horaire (€) *</label>
-            <input type="number" step="0.01" value={clientForm.hourly_rate} onChange={(e) => setClientForm({ ...clientForm, hourly_rate: parseFloat(e.target.value) })} required style={inputStyle} />
-          </div>
+          {clientForm.client_type !== 'SOCIETE' && (
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Taux horaire (€) *</label>
+              <input type="number" step="0.01" value={clientForm.hourly_rate} onChange={(e) => setClientForm({ ...clientForm, hourly_rate: parseFloat(e.target.value) })} required style={inputStyle} />
+            </div>
+          )}
           {clientForm.client_type !== 'SOCIETE' && (
             <div style={{ ...fieldStyle, paddingTop: '12px', borderTop: '1px solid #eee' }}>
               <label style={labelStyle}>Mandataire</label>
@@ -551,7 +554,7 @@ export default function ClientsTab() {
             {client.email && <p style={{ color: '#666', marginBottom: '3px', fontSize: '13px' }}>✉️ {client.email}</p>}
             {client.company_siret && <p style={{ color: '#666', marginBottom: '3px', fontSize: '13px' }}>SIRET : {client.company_siret}</p>}
             {client.company_vat && <p style={{ color: '#666', marginBottom: '3px', fontSize: '13px' }}>TVA : {client.company_vat}</p>}
-            <p style={{ color: '#666', marginBottom: '3px', fontSize: '13px' }}>💰 {client.hourly_rate}€/heure</p>
+            {client.client_type !== 'SOCIETE' && <p style={{ color: '#666', marginBottom: '3px', fontSize: '13px' }}>💰 {client.hourly_rate}€/heure</p>}
             {mandataire && (
               <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #eee' }}>
                 <p style={{ fontSize: '12px', color: '#888', fontWeight: 'bold', marginBottom: '4px' }}>MANDATAIRE</p>
