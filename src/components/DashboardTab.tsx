@@ -1,10 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { useAuthStore } from '../stores/authStore';
 import { useTimesheetStore } from '../stores/timesheetStore.supabase';
 import { useClientStore } from '../stores/clientStore.supabase';
 import { useMandataireStore } from '../stores/mandataireStore.supabase';
 import { useBillingPeriodStore } from '../stores/billingPeriodStore.supabase';
+import { useInvoiceStore } from '../stores/invoiceStore.supabase';
 import { isDureeDirecte } from '../utils/timesheetMode';
 
 const MONTHS = [
@@ -25,6 +26,9 @@ export default function DashboardTab({ onNavigate }: Props) {
   const { clients } = useClientStore();
   const { mandataires } = useMandataireStore();
   const { getPeriod } = useBillingPeriodStore();
+  const { invoices, hydrateInvoices } = useInvoiceStore();
+
+  useEffect(() => { hydrateInvoices(); }, [hydrateInvoices]);
 
   const now = new Date();
   const currentMonth = now.getMonth();
@@ -142,6 +146,35 @@ export default function DashboardTab({ onNavigate }: Props) {
     return { hours, revenue, count: yearTs.length };
   }, [timesheets, clients, currentYear]);
 
+  // ── Facturation par catégorie (année) ───────────────────────────────────
+  //  CESU + Factures SAP (particuliers classique) : depuis les pointages.
+  //  Factures autres (sociétés B2B, hors champ SAP) : factures indépendantes
+  //  (pas de pointage) → somme des montants facturés de l'année.
+
+  const facturation = useMemo(() => {
+    const start = new Date(currentYear, 0, 1).getTime();
+    const end = new Date(currentYear, 11, 31, 23, 59, 59).getTime();
+    const yearTs = timesheets.filter((ts) => ts.date_arrival >= start && ts.date_arrival <= end);
+    const clientById = new Map(clients.map((c) => [c.id, c]));
+
+    const tsRevenue = (pred: (c: any) => boolean) =>
+      yearTs.reduce((s, ts) => {
+        const c = clientById.get(ts.client_id);
+        if (!c || !pred(c)) return s;
+        return s + ts.duration * (c.hourly_rate || 0) + (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + (ts.ik_amount || 0);
+      }, 0);
+
+    const cesu = tsRevenue((c) => c.facturation_mode === 'CESU');
+    const sap = tsRevenue((c) => c.facturation_mode === 'CLASSICAL' && c.client_type !== 'SOCIETE');
+    const autres = invoices.reduce((s, inv) => {
+      const c = clientById.get(inv.client_id);
+      if (!c || c.client_type !== 'SOCIETE' || inv.year !== currentYear) return s;
+      return s + (inv.total_amount || 0);
+    }, 0);
+
+    return { cesu, sap, autres, total: cesu + sap + autres };
+  }, [timesheets, clients, invoices, currentYear]);
+
   // ── Derniers pointages ──────────────────────────────────────────────────
 
   const recentTimesheets = useMemo(() =>
@@ -179,6 +212,20 @@ export default function DashboardTab({ onNavigate }: Props) {
         <StatCard label="Pointages" value={String(monthStats.count)} sub={`${monthStats.totalHours.toFixed(1)}h`} bg="#FFF4E5" color="#b36b00" />
         <StatCard label="Salaire" value={`${monthStats.totalEarnings.toFixed(0)}€`} bg="#F0EBFF" color="#5b3db5" />
         <StatCard label="Total" value={`${(monthStats.totalEarnings + monthStats.totalFrais).toFixed(0)}€`} bg="#007AFF" color="#fff" />
+      </div>
+
+      {/* Facturation par catégorie (année) */}
+      <div style={{ background: 'white', border: '1px solid #eee', borderRadius: '12px', padding: '18px 20px', marginBottom: '20px' }}>
+        <h3 style={{ margin: '0 0 14px', fontSize: '15px', color: '#333' }}>Facturation {currentYear}</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '10px' }}>
+          <StatCard label="CESU" value={`${facturation.cesu.toFixed(0)}€`} bg="#EBF9F0" color="#2d8a4e" />
+          <StatCard label="Factures SAP" value={`${facturation.sap.toFixed(0)}€`} bg="#E8F4FF" color="#1a6fb5" />
+          <StatCard label="Factures autres" value={`${facturation.autres.toFixed(0)}€`} bg="#F0EBFF" color="#5b3db5" />
+          <StatCard label="Total facturé" value={`${facturation.total.toFixed(0)}€`} bg="#5856D6" color="#fff" />
+        </div>
+        <p style={{ fontSize: '11px', color: '#999', margin: '10px 0 0' }}>
+          CESU &amp; Factures SAP = particuliers (services à la personne, depuis les pointages) · Factures autres = sociétés B2B hors champ SAP (factures indépendantes).
+        </p>
       </div>
 
       {/* Évolution 6 mois + Répartition (web only) */}
