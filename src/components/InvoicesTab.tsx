@@ -189,7 +189,7 @@ export default function InvoicesTab() {
       // Le template attend des champs camelCase ; le store User est en snake_case → on mappe
       // (sinon "Votre contact : undefined", display_name n'étant pas lu).
       const userForTemplate = {
-        displayName: user.display_name,
+        displayName: [user.first_name, user.display_name].filter(Boolean).join(' ') || user.display_name,
         email: user.email,
         address: user.address,
         phone: user.phone,

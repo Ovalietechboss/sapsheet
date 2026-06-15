@@ -160,7 +160,7 @@ export default function BilansTab() {
   // ── User profile pour templates ────────────────────────────────────────────
 
   const userProfile = user ? {
-    displayName: user.display_name || user.email,
+    displayName: [user.first_name, user.display_name].filter(Boolean).join(' ') || user.display_name || user.email,
     email: user.email, address: user.address, phone: user.phone,
     cesuNumber: user.cesu_number, siren: user.siren, siret: user.siret,
     businessName: user.business_name, businessAddress: user.business_address,

@@ -160,7 +160,7 @@ export default function ReportsTab() {
       };
 
       const userForTemplate = {
-        displayName: user.display_name,
+        displayName: [user.first_name, user.display_name].filter(Boolean).join(' ') || user.display_name,
         email: user.email,
         address: user.address,
         phone: user.phone,
