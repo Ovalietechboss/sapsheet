@@ -152,13 +152,13 @@ export default function DashboardTab({ onNavigate }: Props) {
   //  (pas de pointage) → somme des montants facturés de l'année.
 
   const facturation = useMemo(() => {
-    const start = new Date(currentYear, 0, 1).getTime();
-    const end = new Date(currentYear, 11, 31, 23, 59, 59).getTime();
-    const yearTs = timesheets.filter((ts) => ts.date_arrival >= start && ts.date_arrival <= end);
+    const start = new Date(currentYear, currentMonth, 1).getTime();
+    const end = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59).getTime();
+    const monthTs = timesheets.filter((ts) => ts.date_arrival >= start && ts.date_arrival <= end);
     const clientById = new Map(clients.map((c) => [c.id, c]));
 
     const tsRevenue = (pred: (c: any) => boolean) =>
-      yearTs.reduce((s, ts) => {
+      monthTs.reduce((s, ts) => {
         const c = clientById.get(ts.client_id);
         if (!c || !pred(c)) return s;
         return s + ts.duration * (c.hourly_rate || 0) + (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0) + (ts.ik_amount || 0);
@@ -168,12 +168,12 @@ export default function DashboardTab({ onNavigate }: Props) {
     const sap = tsRevenue((c) => c.facturation_mode === 'CLASSICAL' && c.client_type !== 'SOCIETE');
     const autres = invoices.reduce((s, inv) => {
       const c = clientById.get(inv.client_id);
-      if (!c || c.client_type !== 'SOCIETE' || inv.year !== currentYear) return s;
+      if (!c || c.client_type !== 'SOCIETE' || inv.year !== currentYear || inv.month !== currentMonth + 1) return s;
       return s + (inv.total_amount || 0);
     }, 0);
 
     return { cesu, sap, autres, total: cesu + sap + autres };
-  }, [timesheets, clients, invoices, currentYear]);
+  }, [timesheets, clients, invoices, currentMonth, currentYear]);
 
   // ── Derniers pointages ──────────────────────────────────────────────────
 
@@ -216,7 +216,7 @@ export default function DashboardTab({ onNavigate }: Props) {
 
       {/* Facturation par catégorie (année) */}
       <div style={{ background: 'white', border: '1px solid #eee', borderRadius: '12px', padding: '18px 20px', marginBottom: '20px' }}>
-        <h3 style={{ margin: '0 0 14px', fontSize: '15px', color: '#333' }}>Facturation {currentYear}</h3>
+        <h3 style={{ margin: '0 0 14px', fontSize: '15px', color: '#333' }}>Facturation — {MONTHS[currentMonth]} {currentYear}</h3>
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '10px' }}>
           <StatCard label="CESU" value={`${facturation.cesu.toFixed(0)}€`} bg="#EBF9F0" color="#2d8a4e" />
           <StatCard label="Factures SAP" value={`${facturation.sap.toFixed(0)}€`} bg="#E8F4FF" color="#1a6fb5" />
