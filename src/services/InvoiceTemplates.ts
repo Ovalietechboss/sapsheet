@@ -352,7 +352,7 @@ export const generateClassicalTemplate = (
         <tr><td class="label">Adresse :</td><td>${user.address || ''}</td></tr>
         ${user.siret ? `<tr><td class="label">N° entreprise :</td><td>${user.siret}</td></tr>` : ''}
         ${user.siren ? `<tr><td class="label">SIREN :</td><td>${user.siren}</td></tr>` : ''}
-        ${user.sapDeclarationNumber ? `<tr><td class="label">N° déclaration SAP :</td><td>${user.sapDeclarationNumber}</td></tr>` : ''}
+        ${user.sapDeclarationNumber && client.client_type !== 'SOCIETE' ? `<tr><td class="label">N° déclaration SAP :</td><td>${user.sapDeclarationNumber}</td></tr>` : ''}
         ${user.phone ? `<tr><td class="label">Téléphone :</td><td>${user.phone}</td></tr>` : ''}
         <tr><td class="label">Email :</td><td>${user.email}</td></tr>
       </table>
@@ -369,6 +369,8 @@ export const generateClassicalTemplate = (
       <p><strong>${clientFullName}</strong></p>
       <p>${client.address}</p>
       ${client.email ? `<p>${client.email}</p>` : ''}
+      ${client.client_type === 'SOCIETE' && client.company_siret ? `<p>SIRET : ${client.company_siret}</p>` : ''}
+      ${client.client_type === 'SOCIETE' && client.company_vat ? `<p>N° TVA : ${client.company_vat}</p>` : ''}
       ${contacts && contacts.length > 0 ? `
         <p style="margin-top:8px;"><strong>Copie à :</strong></p>
         ${contacts.map(c => `<p>${c.label} — ${c.email}</p>`).join('')}
@@ -409,6 +411,10 @@ export const generateClassicalTemplate = (
     <p class="notes">En votre aimable règlement par virement :</p>
     ${user.iban ? `<p class="notes">IBAN : ${user.iban}</p>` : ''}
     ${user.bic ? `<p class="notes">BIC : ${user.bic}</p>` : ''}
+    ${client.client_type === 'SOCIETE' ? `
+      <p class="notes" style="margin-top:10px;">Tout retard de paiement entraîne l'application de pénalités de retard au taux de trois fois le taux d'intérêt légal, ainsi qu'une indemnité forfaitaire pour frais de recouvrement de 40 € (art. L441-10 et D441-5 du Code de commerce).</p>
+      <p class="notes">Aucun escompte n'est accordé pour paiement anticipé.</p>
+    ` : ''}
   </div>
 
   <p class="domitemps">Généré par DomiTemps — Au service de celles et ceux qui prennent soin des autres</p>

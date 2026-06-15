@@ -11,6 +11,10 @@ export interface Client {
   email?: string;
   address: string;
   facturation_mode: 'CESU' | 'CLASSICAL';
+  /** PARTICULIER (défaut, services à la personne) ou SOCIETE (B2B hors champ SAP). */
+  client_type?: 'PARTICULIER' | 'SOCIETE';
+  company_siret?: string;
+  company_vat?: string;
   hourly_rate: number;
   mandataire_id?: string;
   observations?: string;

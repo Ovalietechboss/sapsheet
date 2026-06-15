@@ -274,8 +274,8 @@ export default function ReportsTab() {
         ))}
       </div>
 
-      {/* ── Attestations fiscales annuelles (SAP, art. D7233-4) ── */}
-      {clients.filter((c) => c.facturation_mode !== 'CESU').length > 0 && (
+      {/* ── Attestations fiscales annuelles (SAP, art. D7233-4) — particuliers non-CESU uniquement ── */}
+      {clients.filter((c) => c.facturation_mode !== 'CESU' && c.client_type !== 'SOCIETE').length > 0 && (
         <div style={{ marginBottom: '28px' }}>
           <h3 style={{ marginBottom: '14px' }}>🧾 Attestations fiscales annuelles — {selectedYear}</h3>
           {!user?.sap_declaration_number && (
@@ -284,7 +284,7 @@ export default function ReportsTab() {
             </p>
           )}
           <div style={{ display: 'grid', gap: '12px' }}>
-            {clients.filter((c) => c.facturation_mode !== 'CESU').map((client) => {
+            {clients.filter((c) => c.facturation_mode !== 'CESU' && c.client_type !== 'SOCIETE').map((client) => {
               const isGenerating = generating === 'att-' + client.id;
               return (
                 <div key={client.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'white', border: '1px solid #eee', borderRadius: '10px', padding: '14px 16px', flexWrap: 'wrap', gap: '10px' }}>

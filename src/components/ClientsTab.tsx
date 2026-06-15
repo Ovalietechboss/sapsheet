@@ -38,8 +38,10 @@ export default function ClientsTab() {
   const [showContactForm, setShowContactForm] = useState<string | null>(null); // client_id pour lequel on ajoute un contact
 
   const emptyClientForm = () => ({
+    client_type: 'PARTICULIER' as 'PARTICULIER' | 'SOCIETE',
     titre: '', first_name: '', name: '', email: '', address: '',
     facturation_mode: 'CESU' as 'CESU' | 'CLASSICAL',
+    company_siret: '', company_vat: '',
     hourly_rate: 15.5, mandataire_id: '', observations: '',
   });
   const [clientForm, setClientForm] = useState(emptyClientForm());
@@ -52,9 +54,11 @@ export default function ClientsTab() {
 
   const openEditClient = (c: Client) => {
     setClientForm({
+      client_type: c.client_type || 'PARTICULIER',
       titre: c.titre || '', first_name: c.first_name || '', name: c.name,
       email: c.email || '', address: c.address,
       facturation_mode: c.facturation_mode, hourly_rate: c.hourly_rate,
+      company_siret: c.company_siret || '', company_vat: c.company_vat || '',
       mandataire_id: c.mandataire_id || '', observations: c.observations || '',
     });
     setEditingClient(c);
@@ -65,15 +69,21 @@ export default function ClientsTab() {
     e.preventDefault();
     setSaving(true);
     try {
+      const isSociete = clientForm.client_type === 'SOCIETE';
       const data = {
-        titre: clientForm.titre || undefined,
-        first_name: clientForm.first_name || undefined,
+        client_type: clientForm.client_type,
+        // Société : pas de titre/prénom, raison sociale dans `name`, jamais CESU (hors champ SAP).
+        titre: isSociete ? undefined : (clientForm.titre || undefined),
+        first_name: isSociete ? undefined : (clientForm.first_name || undefined),
         name: clientForm.name,
         email: clientForm.email || undefined,
         address: clientForm.address,
-        facturation_mode: clientForm.facturation_mode,
+        facturation_mode: isSociete ? 'CLASSICAL' as const : clientForm.facturation_mode,
+        company_siret: isSociete ? (clientForm.company_siret || undefined) : undefined,
+        company_vat: isSociete ? (clientForm.company_vat || undefined) : undefined,
         hourly_rate: clientForm.hourly_rate,
-        mandataire_id: clientForm.mandataire_id || undefined,
+        // Société : pas de mandataire (B2B direct).
+        mandataire_id: isSociete ? undefined : (clientForm.mandataire_id || undefined),
         observations: clientForm.observations || undefined,
       };
       if (clientModal === 'edit' && editingClient) {
@@ -149,8 +159,10 @@ export default function ClientsTab() {
     !q || fullName(m.titre, m.first_name, m.name).toLowerCase().includes(q)
        || (m.association_name || '').toLowerCase().includes(q);
 
-  const cesuClients = clients.filter((c) => c.facturation_mode === 'CESU' && matchClient(c));
-  const classicalClients = clients.filter((c) => c.facturation_mode === 'CLASSICAL' && matchClient(c));
+  const isSociete = (c: Client) => c.client_type === 'SOCIETE';
+  const societeClients = clients.filter((c) => isSociete(c) && matchClient(c));
+  const cesuClients = clients.filter((c) => c.facturation_mode === 'CESU' && !isSociete(c) && matchClient(c));
+  const classicalClients = clients.filter((c) => c.facturation_mode === 'CLASSICAL' && !isSociete(c) && matchClient(c));
   const filteredMandataires = mandataires.filter(matchMandataire);
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -224,7 +236,7 @@ export default function ClientsTab() {
             </div>
           </div>
           {/* CLASSIQUE */}
-          <div>
+          <div style={{ marginBottom: '28px' }}>
             <h3 style={{ marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ backgroundColor: '#007AFF', color: 'white', padding: '4px 12px', borderRadius: '4px', fontSize: '13px', fontWeight: 'bold' }}>CLASSIQUE</span>
               {classicalClients.length} client{classicalClients.length !== 1 ? 's' : ''}
@@ -232,6 +244,17 @@ export default function ClientsTab() {
             <div style={{ display: 'grid', gap: '12px' }}>
               {classicalClients.map((c) => renderClientCard(c, '#007AFF'))}
               {classicalClients.length === 0 && <p style={{ color: '#999' }}>Aucun client classique</p>}
+            </div>
+          </div>
+          {/* SOCIÉTÉS (B2B hors champ SAP) */}
+          <div>
+            <h3 style={{ marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ backgroundColor: '#5856D6', color: 'white', padding: '4px 12px', borderRadius: '4px', fontSize: '13px', fontWeight: 'bold' }}>SOCIÉTÉ</span>
+              {societeClients.length} société{societeClients.length !== 1 ? 's' : ''} (B2B, hors champ SAP)
+            </h3>
+            <div style={{ display: 'grid', gap: '12px' }}>
+              {societeClients.map((c) => renderClientCard(c, '#5856D6'))}
+              {societeClients.length === 0 && <p style={{ color: '#999' }}>Aucune société</p>}
             </div>
           </div>
         </>
@@ -293,24 +316,73 @@ export default function ClientsTab() {
         handleClientSubmit,
         () => setClientModal(null),
         <>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
-            <div style={{ width: '90px' }}>
-              <label style={labelStyle}>Titre</label>
-              <select value={clientForm.titre} onChange={(e) => setClientForm({ ...clientForm, titre: e.target.value })} style={inputStyle}>
-                <option value="">—</option>
-                <option value="M.">M.</option>
-                <option value="Mme">Mme</option>
-              </select>
+          {/* Type de client : Particulier (services à la personne) ou Société (B2B hors champ SAP) */}
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Type de client</label>
+            <div style={{ display: 'flex', backgroundColor: '#f0f2f5', borderRadius: '8px', padding: '4px' }}>
+              {([
+                { v: 'PARTICULIER' as const, l: '👤 Particulier' },
+                { v: 'SOCIETE' as const, l: '🏢 Société (B2B)' },
+              ]).map((opt) => (
+                <button
+                  key={opt.v}
+                  type="button"
+                  onClick={() => setClientForm({ ...clientForm, client_type: opt.v })}
+                  style={{
+                    flex: 1, padding: '9px 12px', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: 600, cursor: 'pointer',
+                    backgroundColor: clientForm.client_type === opt.v ? 'white' : 'transparent',
+                    color: clientForm.client_type === opt.v ? '#007AFF' : '#888',
+                    boxShadow: clientForm.client_type === opt.v ? '0 1px 6px rgba(0,0,0,0.12)' : 'none',
+                  }}
+                >
+                  {opt.l}
+                </button>
+              ))}
             </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Prénom</label>
-              <input type="text" value={clientForm.first_name} onChange={(e) => setClientForm({ ...clientForm, first_name: e.target.value })} placeholder="Marie" style={inputStyle} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label style={labelStyle}>Nom *</label>
-              <input type="text" value={clientForm.name} onChange={(e) => setClientForm({ ...clientForm, name: e.target.value })} required placeholder="Dupont" style={inputStyle} />
-            </div>
+            {clientForm.client_type === 'SOCIETE' && (
+              <p style={{ fontSize: '12px', color: '#888', marginTop: '6px' }}>
+                Facturation hors champ SAP (pas de crédit d'impôt / n° SAP) — mentions B2B sur la facture.
+              </p>
+            )}
           </div>
+
+          {clientForm.client_type === 'SOCIETE' ? (
+            <>
+              <div style={fieldStyle}>
+                <label style={labelStyle}>Raison sociale *</label>
+                <input type="text" value={clientForm.name} onChange={(e) => setClientForm({ ...clientForm, name: e.target.value })} required placeholder="Ex: Dupont SARL" style={inputStyle} />
+              </div>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>SIRET</label>
+                  <input type="text" value={clientForm.company_siret} onChange={(e) => setClientForm({ ...clientForm, company_siret: e.target.value })} placeholder="123 456 789 00012" maxLength={17} style={inputStyle} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>N° TVA intra</label>
+                  <input type="text" value={clientForm.company_vat} onChange={(e) => setClientForm({ ...clientForm, company_vat: e.target.value })} placeholder="FR00123456789" style={inputStyle} />
+                </div>
+              </div>
+            </>
+          ) : (
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+              <div style={{ width: '90px' }}>
+                <label style={labelStyle}>Titre</label>
+                <select value={clientForm.titre} onChange={(e) => setClientForm({ ...clientForm, titre: e.target.value })} style={inputStyle}>
+                  <option value="">—</option>
+                  <option value="M.">M.</option>
+                  <option value="Mme">Mme</option>
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>Prénom</label>
+                <input type="text" value={clientForm.first_name} onChange={(e) => setClientForm({ ...clientForm, first_name: e.target.value })} placeholder="Marie" style={inputStyle} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={labelStyle}>Nom *</label>
+                <input type="text" value={clientForm.name} onChange={(e) => setClientForm({ ...clientForm, name: e.target.value })} required placeholder="Dupont" style={inputStyle} />
+              </div>
+            </div>
+          )}
           <div style={fieldStyle}>
             <label style={labelStyle}>Email</label>
             <input type="email" value={clientForm.email} onChange={(e) => setClientForm({ ...clientForm, email: e.target.value })} placeholder="marie@email.fr" style={inputStyle} />
@@ -319,30 +391,34 @@ export default function ClientsTab() {
             <label style={labelStyle}>Adresse *</label>
             <input type="text" value={clientForm.address} onChange={(e) => setClientForm({ ...clientForm, address: e.target.value })} required placeholder="12 rue des Lilas, 75001 Paris" style={inputStyle} />
           </div>
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Mode de facturation</label>
-            <select value={clientForm.facturation_mode} onChange={(e) => setClientForm({ ...clientForm, facturation_mode: e.target.value as 'CESU' | 'CLASSICAL' })} style={inputStyle}>
-              <option value="CESU">CESU</option>
-              <option value="CLASSICAL">Classique</option>
-            </select>
-          </div>
+          {clientForm.client_type !== 'SOCIETE' && (
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Mode de facturation</label>
+              <select value={clientForm.facturation_mode} onChange={(e) => setClientForm({ ...clientForm, facturation_mode: e.target.value as 'CESU' | 'CLASSICAL' })} style={inputStyle}>
+                <option value="CESU">CESU</option>
+                <option value="CLASSICAL">Classique</option>
+              </select>
+            </div>
+          )}
           <div style={fieldStyle}>
             <label style={labelStyle}>Taux horaire (€) *</label>
             <input type="number" step="0.01" value={clientForm.hourly_rate} onChange={(e) => setClientForm({ ...clientForm, hourly_rate: parseFloat(e.target.value) })} required style={inputStyle} />
           </div>
-          <div style={{ ...fieldStyle, paddingTop: '12px', borderTop: '1px solid #eee' }}>
-            <label style={labelStyle}>Mandataire</label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <select value={clientForm.mandataire_id} onChange={(e) => setClientForm({ ...clientForm, mandataire_id: e.target.value })} style={{ ...inputStyle, flex: 1 }}>
-                <option value="">— Aucun —</option>
-                {mandataires.map((m) => <option key={m.id} value={m.id}>{mandataireLabel(m)}</option>)}
-              </select>
-              <button type="button" onClick={() => { setMandataireModal('create'); setMandataireForm(emptyMandataireForm()); }}
-                style={{ padding: '10px 12px', backgroundColor: '#34C759', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap', fontSize: '13px' }}>
-                +
-              </button>
+          {clientForm.client_type !== 'SOCIETE' && (
+            <div style={{ ...fieldStyle, paddingTop: '12px', borderTop: '1px solid #eee' }}>
+              <label style={labelStyle}>Mandataire</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <select value={clientForm.mandataire_id} onChange={(e) => setClientForm({ ...clientForm, mandataire_id: e.target.value })} style={{ ...inputStyle, flex: 1 }}>
+                  <option value="">— Aucun —</option>
+                  {mandataires.map((m) => <option key={m.id} value={m.id}>{mandataireLabel(m)}</option>)}
+                </select>
+                <button type="button" onClick={() => { setMandataireModal('create'); setMandataireForm(emptyMandataireForm()); }}
+                  style={{ padding: '10px 12px', backgroundColor: '#34C759', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', whiteSpace: 'nowrap', fontSize: '13px' }}>
+                  +
+                </button>
+              </div>
             </div>
-          </div>
+          )}
           {/* Observations */}
           <div style={fieldStyle}>
             <label style={labelStyle}>Observations / Instructions</label>
@@ -467,9 +543,14 @@ export default function ClientsTab() {
       <div key={client.id} style={{ backgroundColor: 'white', padding: '18px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: `2px solid ${borderColor}` }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
           <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => openEditClient(client)}>
-            <h4 style={{ marginBottom: '6px', fontSize: '17px' }}>{fullName(client.titre, client.first_name, client.name)}</h4>
+            <h4 style={{ marginBottom: '6px', fontSize: '17px' }}>
+              {fullName(client.titre, client.first_name, client.name)}
+              {client.client_type === 'SOCIETE' && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#5856D6', fontWeight: 'bold' }}>🏢 SOCIÉTÉ</span>}
+            </h4>
             <p style={{ color: '#666', marginBottom: '3px', fontSize: '13px' }}>📍 {client.address}</p>
             {client.email && <p style={{ color: '#666', marginBottom: '3px', fontSize: '13px' }}>✉️ {client.email}</p>}
+            {client.company_siret && <p style={{ color: '#666', marginBottom: '3px', fontSize: '13px' }}>SIRET : {client.company_siret}</p>}
+            {client.company_vat && <p style={{ color: '#666', marginBottom: '3px', fontSize: '13px' }}>TVA : {client.company_vat}</p>}
             <p style={{ color: '#666', marginBottom: '3px', fontSize: '13px' }}>💰 {client.hourly_rate}€/heure</p>
             {mandataire && (
               <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #eee' }}>
