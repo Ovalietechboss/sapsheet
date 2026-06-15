@@ -7,6 +7,7 @@ import { useClientStore, ClientContact } from '../stores/clientStore.supabase';
 import { useMandataireStore, Mandataire } from '../stores/mandataireStore.supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useBillingPeriodStore, BillingPeriod, ClientDocStatus } from '../stores/billingPeriodStore.supabase';
+import { useInvoiceStore } from '../stores/invoiceStore.supabase';
 import { generateCESUTemplate, generateClassicalTemplate, generateRecapTemplate } from '../services/InvoiceTemplates';
 import { generateAndSharePDF } from '../utils/pdfGenerator';
 import { isDureeDirecte } from '../utils/timesheetMode';
@@ -51,6 +52,7 @@ export default function BilansTab() {
   const { clients, getContactsForClient } = useClientStore();
   const { mandataires } = useMandataireStore();
   const { user } = useAuthStore();
+  const { invoices, addInvoice, updateInvoice } = useInvoiceStore();
   const {
     periods, getOrCreatePeriod, getPeriod, getClientStatus,
     upsertClientStatus, lockPeriod, unlockPeriod, archivePeriod,
@@ -189,6 +191,28 @@ export default function BilansTab() {
 
       const filename = `${invoiceNumber}`;
       await generateAndSharePDF(html, filename);
+
+      // Lien Bilans → module Factures : suivi de la facture (clients classiques uniquement ;
+      // CESU = pointage, pas une facture). Idempotent : maj si déjà suivie pour ce client/mois.
+      if (!isCESU) {
+        const existing = invoices.find(
+          (i) => i.client_id === client.id && i.month === selectedMonth && i.year === selectedYear,
+        );
+        if (existing) {
+          await updateInvoice(existing.id, { total_amount: row.totalAmount, invoice_number: invoiceNumber });
+        } else {
+          await addInvoice({
+            invoice_number: invoiceNumber,
+            client_id: client.id,
+            status: 'sent',
+            total_amount: row.totalAmount,
+            month: selectedMonth,
+            year: selectedYear,
+            generated_at: Date.now(),
+            facturation_mode: 'CLASSICAL',
+          });
+        }
+      }
 
       await upsertClientStatus(period.id, client.id, {
         status: 'generated', doc_generated_at: Date.now(), recipient_email: row.recipientEmail,

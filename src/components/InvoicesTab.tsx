@@ -153,23 +153,12 @@ export default function InvoicesTab() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-        <h2>Invoices ({invoices.length})</h2>
-        <button
-          onClick={() => setShowModal(true)}
-          disabled={unbilledTimesheets.length === 0}
-          style={{
-            padding: '12px 24px',
-            backgroundColor: unbilledTimesheets.length === 0 ? '#ccc' : '#007AFF',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: unbilledTimesheets.length === 0 ? 'not-allowed' : 'pointer',
-            fontWeight: 'bold',
-          }}
-        >
-          + Generate Invoice
-        </button>
+      <div style={{ marginBottom: '24px' }}>
+        <h2 style={{ margin: 0 }}>Factures ({invoices.length})</h2>
+        <p style={{ color: '#666', fontSize: '13px', marginTop: '6px' }}>
+          Les factures se génèrent depuis l'onglet <strong>Bilans</strong> (par client, en fin de mois).
+          Cet onglet sert au <strong>suivi</strong> : statut payé/impayé, attestation fiscale.
+        </p>
       </div>
 
       {/* Invoices List */}
