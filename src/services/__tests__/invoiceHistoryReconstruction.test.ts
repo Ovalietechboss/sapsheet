@@ -49,6 +49,20 @@ describe('reconstructDomiTempsInvoiceHistory', () => {
     expect(res).toHaveLength(0);
   });
 
+  it('exclut le mois courant et le futur via `before` (ex. juin écarté)', () => {
+    const res = reconstructDomiTempsInvoiceHistory({
+      ...base,
+      periodClients: [
+        pc('p3', 'c1', 'generated', new Date('2026-03-31').getTime()),
+        pc('p6', 'c1', 'generated', new Date('2026-06-10').getTime()),
+      ],
+      periods: [period('p3', 3, 2026), period('p6', 6, 2026)],
+      timesheets: [ts('c1', '2026-03-05', 1), ts('c1', '2026-06-05', 1)],
+      before: { month: 6, year: 2026 },
+    });
+    expect(res.map((r) => r.month)).toEqual([3]); // juin (mois courant) exclu
+  });
+
   it('trie par date', () => {
     const res = reconstructDomiTempsInvoiceHistory({
       ...base,

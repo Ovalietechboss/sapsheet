@@ -36,6 +36,8 @@ export function reconstructDomiTempsInvoiceHistory(params: {
   periodClients: ReadonlyArray<Pick<BillingPeriodClient, 'period_id' | 'client_id' | 'status' | 'doc_generated_at'>>;
   clients: ReadonlyArray<Pick<Client, 'id' | 'name' | 'hourly_rate' | 'facturation_mode'>>;
   timesheets: ReadonlyArray<Pick<Timesheet, 'client_id' | 'date_arrival' | 'duration' | 'frais_repas' | 'frais_transport' | 'frais_autres' | 'ik_amount'>>;
+  /** N'inclure que les périodes STRICTEMENT avant ce mois (exclut le mois courant et le futur). */
+  before?: { month: number; year: number };
 }): ReconstructedInvoice[] {
   const periodById = new Map(params.periods.map((p) => [p.id, p]));
   const clientById = new Map(params.clients.map((c) => [c.id, c]));
@@ -47,6 +49,9 @@ export function reconstructDomiTempsInvoiceHistory(params: {
     const client = clientById.get(pc.client_id);
     if (!period || !client) continue;
     if (client.facturation_mode === 'CESU') continue; // CESU = pointage, pas une facture
+    if (params.before && (period.year > params.before.year || (period.year === params.before.year && period.month >= params.before.month))) {
+      continue; // exclut le mois courant (et le futur) : seules les factures AVANT ce mois sont importées
+    }
 
     const cts = params.timesheets.filter((ts) => {
       if (ts.client_id !== client.id) return false;
