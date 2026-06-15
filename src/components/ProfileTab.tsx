@@ -39,6 +39,8 @@ export default function ProfileTab() {
       siret: user.siret || '',
       business_name: user.business_name || '',
       business_address: user.business_address || '',
+      sap_declaration_number: user.sap_declaration_number || '',
+      sap_declaration_date: user.sap_declaration_date || '',
       avatar_url: user.avatar_url || '',
     });
     setIsEditing(true);
@@ -142,6 +144,8 @@ export default function ProfileTab() {
             <InfoRow label="SIRET" value={user.siret} />
             <InfoRow label="NOM ENTREPRISE" value={user.business_name} />
             <InfoRow label="ADRESSE ENTREPRISE" value={user.business_address} />
+            <InfoRow label="N° DÉCLARATION SAP" value={user.sap_declaration_number} />
+            <InfoRow label="DATE DÉCLARATION SAP" value={user.sap_declaration_date} />
           </div>
         </div>
       </div>
@@ -234,6 +238,14 @@ export default function ProfileTab() {
             <div style={fieldStyle}>
               <label style={labelStyle}>Adresse entreprise</label>
               <input type="text" value={formData.business_address} onChange={(e) => setFormData({ ...formData, business_address: e.target.value })} style={inputStyle} />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>N° déclaration SAP</label>
+              <input type="text" value={formData.sap_declaration_number} onChange={(e) => setFormData({ ...formData, sap_declaration_number: e.target.value })} placeholder="SAP880186515" style={inputStyle} />
+            </div>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Date déclaration SAP</label>
+              <input type="text" value={formData.sap_declaration_date} onChange={(e) => setFormData({ ...formData, sap_declaration_date: e.target.value })} placeholder="14/03/2020" style={inputStyle} />
             </div>
           </div>
         </div>

@@ -34,7 +34,7 @@ export interface AttestationData {
 }
 
 export interface BuildAttestationParams {
-  user: Pick<User, 'display_name' | 'business_name' | 'business_address' | 'address' | 'siren' | 'siret'>;
+  user: Pick<User, 'display_name' | 'business_name' | 'business_address' | 'address' | 'siren' | 'siret' | 'sap_declaration_number' | 'sap_declaration_date'>;
   client: Pick<Client, 'titre' | 'first_name' | 'name' | 'address'>;
   clientId: string;
   year: number;
@@ -66,8 +66,8 @@ export function buildAttestationData(p: BuildAttestationParams): AttestationData
       siren: p.user.siren,
       siret: p.user.siret,
     },
-    sapDeclarationNumber: p.sapDeclarationNumber,
-    sapDeclarationDate: p.sapDeclarationDate,
+    sapDeclarationNumber: p.sapDeclarationNumber ?? p.user.sap_declaration_number,
+    sapDeclarationDate: p.sapDeclarationDate ?? p.user.sap_declaration_date,
     beneficiary: { name: beneficiaryName, address: p.client.address },
     montantAcquitte,
     interventions,
