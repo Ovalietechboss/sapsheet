@@ -193,24 +193,29 @@ export default function BilansTab() {
       await generateAndSharePDF(html, filename);
 
       // Lien Bilans → module Factures : suivi de la facture (clients classiques uniquement ;
-      // CESU = pointage, pas une facture). Idempotent : maj si déjà suivie pour ce client/mois.
+      // CESU = pointage, pas une facture). Idempotent + SOFT-FAIL : si l'écriture échoue
+      // (ex. table `invoices` absente), on NE casse PAS la génération Bilans (cœur métier).
       if (!isCESU) {
-        const existing = invoices.find(
-          (i) => i.client_id === client.id && i.month === selectedMonth && i.year === selectedYear,
-        );
-        if (existing) {
-          await updateInvoice(existing.id, { total_amount: row.totalAmount, invoice_number: invoiceNumber });
-        } else {
-          await addInvoice({
-            invoice_number: invoiceNumber,
-            client_id: client.id,
-            status: 'sent',
-            total_amount: row.totalAmount,
-            month: selectedMonth,
-            year: selectedYear,
-            generated_at: Date.now(),
-            facturation_mode: 'CLASSICAL',
-          });
+        try {
+          const existing = invoices.find(
+            (i) => i.client_id === client.id && i.month === selectedMonth && i.year === selectedYear,
+          );
+          if (existing) {
+            await updateInvoice(existing.id, { total_amount: row.totalAmount, invoice_number: invoiceNumber });
+          } else {
+            await addInvoice({
+              invoice_number: invoiceNumber,
+              client_id: client.id,
+              status: 'sent',
+              total_amount: row.totalAmount,
+              month: selectedMonth,
+              year: selectedYear,
+              generated_at: Date.now(),
+              facturation_mode: 'CLASSICAL',
+            });
+          }
+        } catch (e) {
+          console.warn('[Bilans→Factures] suivi non enregistré (table invoices ?) :', e);
         }
       }
 
