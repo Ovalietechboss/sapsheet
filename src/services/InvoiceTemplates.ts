@@ -1,4 +1,4 @@
-import { Invoice } from '../stores/invoiceStore.supabase';
+import { Invoice, InvoiceLine } from '../stores/invoiceStore.supabase';
 import { Client, ClientContact } from '../stores/clientStore.supabase';
 import { Timesheet } from '../stores/timesheetStore.supabase';
 import { Mandataire } from '../stores/mandataireStore.supabase';
@@ -224,7 +224,8 @@ export const generateClassicalTemplate = (
   timesheets: Timesheet[],
   user: User,
   mandataire?: Mandataire,
-  contacts?: ClientContact[]
+  contacts?: ClientContact[],
+  lines?: InvoiceLine[]
 ): string => {
   const formatDate = (timestamp: number) =>
     new Date(timestamp).toLocaleDateString('fr-FR');
@@ -297,6 +298,27 @@ export const generateClassicalTemplate = (
       <td style="${td} text-align: center;"></td>
       <td style="${td} text-align: right; font-weight: bold;">${totalOtherFrais.toFixed(2)} €</td>
     </tr>` : '';
+
+  // Facture INDÉPENDANTE (société B2B) : lignes libres au lieu du détail pointages.
+  const isIndependent = !!(lines && lines.length > 0);
+  const indepDetailHTML = isIndependent
+    ? lines!.map((l) => {
+        const lineTotal = Math.round(l.quantity * l.unit_price * 100) / 100;
+        return `
+      <tr>
+        <td style="${td}">Prestation</td>
+        <td style="${td}"><strong>${l.designation}</strong></td>
+        <td style="${td} text-align: right;">${l.unit_price.toFixed(2)} €</td>
+        <td style="${td} text-align: center;">${l.quantity % 1 === 0 ? l.quantity.toFixed(0) : l.quantity}</td>
+        <td style="${td} text-align: right; font-weight: bold;">${lineTotal.toFixed(2)} €</td>
+      </tr>`;
+      }).join('')
+    : '';
+  const indepTotal = isIndependent
+    ? Math.round(lines!.reduce((s, l) => s + l.quantity * l.unit_price, 0) * 100) / 100
+    : 0;
+  const timesheetTotal = Math.round((timesheets.reduce((s, ts) => s + Math.round(ts.duration * hourlyRate * 100) / 100, 0) + totalFrais) * 100) / 100;
+  const grandTotal = isIndependent ? indepTotal : timesheetTotal;
 
   const clientFullName = [client.titre, client.first_name, client.name].filter(Boolean).join(' ');
   const mandataireFullName = mandataire ? [mandataire.titre, mandataire.first_name, mandataire.name].filter(Boolean).join(' ') : '';
@@ -390,9 +412,7 @@ export const generateClassicalTemplate = (
       </tr>
     </thead>
     <tbody>
-      ${detailHTML}
-      ${ikHTML}
-      ${otherFraisHTML}
+      ${isIndependent ? indepDetailHTML : `${detailHTML}${ikHTML}${otherFraisHTML}`}
     </tbody>
   </table>
 
@@ -400,7 +420,7 @@ export const generateClassicalTemplate = (
     <div class="total-tva">TVA non applicable, art. 293 B du CGI</div>
     <div class="total-amount">
       <span class="label">Total</span>
-      <span class="value">${(Math.round((timesheets.reduce((s, ts) => s + Math.round(ts.duration * hourlyRate * 100) / 100, 0) + totalFrais) * 100) / 100).toFixed(2)} €</span>
+      <span class="value">${grandTotal.toFixed(2)} €</span>
     </div>
   </div>
 

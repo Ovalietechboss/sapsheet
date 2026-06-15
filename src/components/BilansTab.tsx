@@ -7,8 +7,9 @@ import { useClientStore, ClientContact } from '../stores/clientStore.supabase';
 import { useMandataireStore, Mandataire } from '../stores/mandataireStore.supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useBillingPeriodStore, BillingPeriod, ClientDocStatus } from '../stores/billingPeriodStore.supabase';
-import { useInvoiceStore } from '../stores/invoiceStore.supabase';
+import { useInvoiceStore, InvoiceLine } from '../stores/invoiceStore.supabase';
 import { generateCESUTemplate, generateClassicalTemplate, generateRecapTemplate } from '../services/InvoiceTemplates';
+import { nextInvoiceNumber } from '../services/invoiceNumbering';
 import { generateAndSharePDF } from '../utils/pdfGenerator';
 import { isDureeDirecte } from '../utils/timesheetMode';
 
@@ -28,6 +29,7 @@ interface ClientRow {
   clientId: string;
   clientName: string;
   facturationMode: 'CESU' | 'CLASSICAL';
+  clientType: 'PARTICULIER' | 'SOCIETE';
   clientEmail?: string;
   mandataire?: Mandataire;
   timesheetCount: number;
@@ -70,6 +72,10 @@ export default function BilansTab() {
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; mode: 'CESU' | 'CLASSICAL' } | null>(null);
   const [confirmBulk, setConfirmBulk] = useState<{ mode: 'CESU' | 'CLASSICAL'; alreadyGen: number; pending: number } | null>(null);
   const [detailClient, setDetailClient] = useState<ClientRow | null>(null);
+  // Facture indépendante (société B2B, lignes libres)
+  const [societeModal, setSocieteModal] = useState<ClientRow | null>(null);
+  const [societeLines, setSocieteLines] = useState<InvoiceLine[]>([{ designation: '', quantity: 1, unit_price: 0 }]);
+  const [societeDate, setSocieteDate] = useState('');
 
   const years = Array.from({ length: 5 }, (_, i) => currentDate.getFullYear() - 3 + i).reverse();
 
@@ -102,6 +108,7 @@ export default function BilansTab() {
         clientId: client.id,
         clientName: [client.titre, client.first_name, client.name].filter(Boolean).join(' '),
         facturationMode: client.facturation_mode,
+        clientType: client.client_type || 'PARTICULIER',
         clientEmail: client.email,
         mandataire,
         timesheetCount: cts.length,
@@ -226,6 +233,74 @@ export default function BilansTab() {
     } catch (err) {
       console.error('Génération échouée:', err);
       if (currentPeriod) await upsertClientStatus(currentPeriod.id, row.clientId, { status: 'error' });
+    } finally {
+      setGenerating(null);
+    }
+  };
+
+  // ── Facture indépendante (société B2B, lignes libres) ───────────────────────
+
+  const openSocieteModal = (row: ClientRow) => {
+    setSocieteLines([{ designation: '', quantity: 1, unit_price: 0 }]);
+    const today = new Date();
+    setSocieteDate(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`);
+    setSocieteModal(row);
+  };
+
+  const societeTotal = societeLines.reduce(
+    (s, l) => s + (Number(l.quantity) || 0) * (Number(l.unit_price) || 0), 0,
+  );
+
+  const handleGenerateSociete = async () => {
+    if (!user || !userProfile || !societeModal) return;
+    const client = clients.find((c) => c.id === societeModal.clientId);
+    if (!client) return;
+    const validLines: InvoiceLine[] = societeLines
+      .filter((l) => l.designation.trim() && (Number(l.quantity) || 0) > 0)
+      .map((l) => ({ designation: l.designation.trim(), quantity: Number(l.quantity), unit_price: Number(l.unit_price) || 0 }));
+    if (validLines.length === 0) { alert('Ajoutez au moins une ligne (désignation + quantité).'); return; }
+
+    const dateMs = societeDate ? new Date(societeDate).getTime() : Date.now();
+    const d = new Date(dateMs);
+    const invMonth = d.getMonth() + 1;
+    const invYear = d.getFullYear();
+    const total = Math.round(validLines.reduce((s, l) => s + l.quantity * l.unit_price, 0) * 100) / 100;
+    const invoiceNumber = nextInvoiceNumber(invoices, invYear);
+
+    setGenerating(societeModal.clientId);
+    try {
+      const invoiceData: any = {
+        invoice_number: invoiceNumber,
+        created_at: Date.now(),
+        generated_at: dateMs,
+        total_amount: total,
+        month: invMonth,
+        year: invYear,
+        lines: validLines,
+      };
+      const html = generateClassicalTemplate(invoiceData, client, [], userProfile, undefined, getContactsForClient(client.id), validLines);
+      await generateAndSharePDF(html, invoiceNumber);
+
+      // Enregistrement (suivi dans le module Factures) — soft-fail comme les autres.
+      try {
+        await addInvoice({
+          invoice_number: invoiceNumber,
+          client_id: client.id,
+          status: 'sent',
+          total_amount: total,
+          month: invMonth,
+          year: invYear,
+          lines: validLines,
+          generated_at: dateMs,
+          facturation_mode: 'CLASSICAL',
+        });
+      } catch (e) {
+        console.warn('[Société→Factures] suivi non enregistré (migration lines/invoices ?) :', e);
+      }
+      setSocieteModal(null);
+    } catch (err) {
+      console.error('Génération facture société échouée:', err);
+      alert('Erreur lors de la génération de la facture.');
     } finally {
       setGenerating(null);
     }
@@ -522,8 +597,33 @@ export default function BilansTab() {
                 </div>
 
                 {group.clients.map((row) => {
+                  const isSociete = row.clientType === 'SOCIETE';
                   const isCESU = row.facturationMode === 'CESU';
-                  const color = isCESU ? '#34C759' : '#007AFF';
+                  const color = isSociete ? '#5856D6' : isCESU ? '#34C759' : '#007AFF';
+                  // Société : facture indépendante (lignes libres), pas de pointage → toujours actionnable.
+                  if (isSociete) {
+                    return (
+                      <div key={row.clientId} style={{ padding: '14px 16px', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '2px' }}>
+                            <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{row.clientName}</span>
+                            <span style={{ fontSize: '10px', fontWeight: '700', padding: '1px 7px', borderRadius: '10px', backgroundColor: '#F0EBFF', color, border: `1px solid ${color}` }}>
+                              🏢 SOCIÉTÉ
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#888' }}>Facture indépendante (B2B, hors champ SAP)</div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {!isLocked && (
+                            <button disabled={generating === row.clientId} onClick={() => openSocieteModal(row)}
+                              style={{ padding: '7px 14px', backgroundColor: generating === row.clientId ? '#ccc' : color, color: 'white', border: 'none', borderRadius: '6px', cursor: generating === row.clientId ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                              {generating === row.clientId ? '...' : '+ Facture indépendante'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
                   return (
                     <div key={row.clientId} style={{ padding: '14px 16px', borderTop: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', opacity: row.timesheetCount === 0 ? 0.45 : 1 }}>
                       <div style={{ flex: 1, cursor: row.timesheetCount > 0 ? 'pointer' : 'default' }}
@@ -814,6 +914,67 @@ export default function BilansTab() {
           </div>
         );
       })()}
+
+      {/* Modal facture indépendante (société B2B) */}
+      {societeModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }} onClick={() => setSocieteModal(null)}>
+          <div style={{ background: 'white', padding: '24px 28px', borderRadius: '12px', width: '94%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ margin: 0, fontSize: '19px' }}>Facture indépendante — {societeModal.clientName}</h2>
+            <p style={{ margin: '4px 0 18px', color: '#888', fontSize: '13px' }}>
+              Société B2B, hors champ SAP · n° attribué automatiquement ({nextInvoiceNumber(invoices, societeDate ? new Date(societeDate).getFullYear() : selectedYear)})
+            </p>
+
+            <div style={{ marginBottom: '16px', maxWidth: '220px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold', fontSize: '13px' }}>Date de la facture</label>
+              <input type="date" value={societeDate} onChange={(e) => setSocieteDate(e.target.value)}
+                style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }} />
+            </div>
+
+            {/* Éditeur de lignes */}
+            <div style={{ border: '1px solid #eee', borderRadius: '8px', overflow: 'hidden', marginBottom: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 90px 90px 32px', gap: '8px', padding: '8px 12px', background: '#f5f5f5', fontSize: '12px', color: '#666', fontWeight: 600 }}>
+                <span>Désignation</span><span style={{ textAlign: 'center' }}>Qté</span><span style={{ textAlign: 'right' }}>PU HT</span><span style={{ textAlign: 'right' }}>Total</span><span />
+              </div>
+              {societeLines.map((l, idx) => {
+                const lineTotal = (Number(l.quantity) || 0) * (Number(l.unit_price) || 0);
+                const updateLine = (patch: Partial<InvoiceLine>) =>
+                  setSocieteLines(societeLines.map((x, i) => (i === idx ? { ...x, ...patch } : x)));
+                return (
+                  <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 90px 90px 32px', gap: '8px', padding: '8px 12px', borderTop: '1px solid #f0f0f0', alignItems: 'center' }}>
+                    <input type="text" value={l.designation} onChange={(e) => updateLine({ designation: e.target.value })}
+                      placeholder="Prestation…" style={{ padding: '8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px', boxSizing: 'border-box', width: '100%' }} />
+                    <input type="number" step="0.01" value={l.quantity} onChange={(e) => updateLine({ quantity: parseFloat(e.target.value) })}
+                      style={{ padding: '8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px', boxSizing: 'border-box', width: '100%', textAlign: 'center' }} />
+                    <input type="number" step="0.01" value={l.unit_price} onChange={(e) => updateLine({ unit_price: parseFloat(e.target.value) })}
+                      style={{ padding: '8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px', boxSizing: 'border-box', width: '100%', textAlign: 'right' }} />
+                    <span style={{ textAlign: 'right', fontSize: '13px', fontWeight: 600 }}>{lineTotal.toFixed(2)} €</span>
+                    <button type="button" onClick={() => setSocieteLines(societeLines.length > 1 ? societeLines.filter((_, i) => i !== idx) : societeLines)}
+                      style={{ padding: '4px', background: '#ff3b30', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}>×</button>
+                  </div>
+                );
+              })}
+            </div>
+            <button type="button" onClick={() => setSocieteLines([...societeLines, { designation: '', quantity: 1, unit_price: 0 }])}
+              style={{ padding: '8px 14px', background: 'white', border: '1px dashed #5856D6', borderRadius: '6px', color: '#5856D6', cursor: 'pointer', fontSize: '13px', fontWeight: 600, marginBottom: '16px' }}>
+              + Ajouter une ligne
+            </button>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', gap: '12px', marginBottom: '8px' }}>
+              <span style={{ fontSize: '13px', color: '#555', fontWeight: 'bold' }}>Total HT</span>
+              <span style={{ fontSize: '22px', fontWeight: 'bold' }}>{societeTotal.toFixed(2)} €</span>
+            </div>
+            <p style={{ fontSize: '11px', color: '#999', textAlign: 'right', margin: '0 0 18px' }}>TVA non applicable, art. 293 B du CGI · mentions B2B incluses sur le PDF</p>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setSocieteModal(null)} style={{ flex: 1, padding: '12px', background: '#f5f5f5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Annuler</button>
+              <button onClick={handleGenerateSociete} disabled={generating === societeModal.clientId}
+                style={{ flex: 1, padding: '12px', background: generating === societeModal.clientId ? '#ccc' : '#5856D6', color: 'white', border: 'none', borderRadius: '8px', cursor: generating === societeModal.clientId ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}>
+                {generating === societeModal.clientId ? 'Génération…' : 'Générer la facture'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal confirmation régénération en masse */}
       {confirmBulk && (

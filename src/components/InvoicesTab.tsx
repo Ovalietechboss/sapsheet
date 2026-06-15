@@ -158,7 +158,8 @@ export default function InvoicesTab() {
       const htmlContent =
         mode === 'CESU'
           ? generateCESUTemplate(invoiceData, client, invoiceTimesheets, userForTemplate)
-          : generateClassicalTemplate(invoiceData, client, invoiceTimesheets, userForTemplate);
+          // Facture indépendante (société) : on rejoue les lignes libres stockées plutôt que les pointages.
+          : generateClassicalTemplate(invoiceData, client, invoiceTimesheets, userForTemplate, undefined, undefined, invoice.lines);
 
       await generateAndSharePDF(htmlContent, `invoice_${invoice.invoice_number}.pdf`);
     } catch (error: any) {

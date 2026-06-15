@@ -2,6 +2,13 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from './authStore';
 
+/** Ligne d'une facture indépendante (société B2B, sans pointage). */
+export interface InvoiceLine {
+  designation: string;
+  quantity: number;
+  unit_price: number; // prix unitaire HT
+}
+
 export interface Invoice {
   id: string;
   user_id: string;
@@ -11,6 +18,8 @@ export interface Invoice {
   total_amount: number;
   month: number;
   year: number;
+  /** Lignes libres (facture indépendante). Absent pour les factures issues des pointages. */
+  lines?: InvoiceLine[];
   generated_at: number;
   created_at: number;
   updated_at: number;
