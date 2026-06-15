@@ -1,17 +1,14 @@
 // Edge Function Supabase : envoi d'une facture par email via Resend.
 //
-// Déploiement (voir GUIDE-EMAIL-RESEND.md) :
-//   supabase functions deploy send-invoice
-//   supabase secrets set RESEND_API_KEY=re_xxx
-//   supabase secrets set INVOICE_FROM_EMAIL="Cathy <facture@ton-domaine.fr>"
+// Déploiement en ligne (dashboard) : Edge Functions → Create function → coller ce code → Deploy.
+// Secrets à définir (Edge Functions → Secrets) :
+//   RESEND_API_KEY      = re_xxx
+//   INVOICE_FROM_EMAIL  = "Bigorre Aide <facture@bigorre-aide.fr>"
 //
 // Le client appelle : supabase.functions.invoke('send-invoice', { body: {...} })
 // Body attendu : { to, cc?, subject, message, pdfBase64, filename }
 
-import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
-
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-// FROM doit utiliser un domaine vérifié dans Resend ; à défaut, l'adresse de test onboarding@resend.dev.
 const FROM = Deno.env.get('INVOICE_FROM_EMAIL') || 'DomiTemps <onboarding@resend.dev>';
 
 const corsHeaders = {
@@ -20,12 +17,12 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
     if (!RESEND_API_KEY) {
-      return json({ error: 'RESEND_API_KEY non configurée (supabase secrets set).' }, 500);
+      return json({ error: 'RESEND_API_KEY non configurée (Edge Functions → Secrets).' }, 500);
     }
     const { to, cc, subject, message, pdfBase64, filename } = await req.json();
     if (!to || !pdfBase64) {
@@ -54,7 +51,7 @@ serve(async (req) => {
     }
     return json({ ok: true, id: data?.id });
   } catch (e) {
-    return json({ error: String(e?.message || e) }, 500);
+    return json({ error: String((e as Error)?.message || e) }, 500);
   }
 });
 
