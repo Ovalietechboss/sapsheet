@@ -24,6 +24,10 @@ CREATE INDEX IF NOT EXISTS idx_invoices_user_id   ON invoices(user_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_client_id ON invoices(client_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_year_month ON invoices(year, month);
 
--- RLS désactivée, cohérent avec billing_period_clients (app mono-utilisateur via clé anon).
--- À durcir plus tard si multi-utilisateurs (politique user_id = auth.uid()).
-ALTER TABLE invoices DISABLE ROW LEVEL SECURITY;
+-- RLS ACTIVÉE + politique identique à clients/timesheets (helper public.get_my_user_id()
+-- déjà créé par supabase-migration-rls.sql). Sécurise : un utilisateur ne voit que SES factures.
+ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "invoices_all" ON invoices;
+CREATE POLICY "invoices_all" ON invoices
+  FOR ALL USING (user_id = public.get_my_user_id() OR public.is_admin())
+  WITH CHECK (user_id = public.get_my_user_id() OR public.is_admin());
