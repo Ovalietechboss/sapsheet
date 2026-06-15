@@ -4,6 +4,7 @@ import { useTimesheetStore } from '../stores/timesheetStore.supabase';
 import { useClientStore } from '../stores/clientStore.supabase';
 import { useAuthStore } from '../stores/authStore';
 import { generateCESUTemplate, generateClassicalTemplate } from '../services/InvoiceTemplates';
+import { nextInvoiceNumber } from '../services/invoiceNumbering';
 import { generateAndSharePDF } from '../utils/pdfGenerator';
 
 export default function InvoicesTab() {
@@ -44,11 +45,12 @@ export default function InvoicesTab() {
     const hourlyRate = client.hourly_rate || 15.5;
     const totalAmount = totalHours * hourlyRate + totalFrais;
 
-    // Generate invoice number
+    // N° de facture — série annuelle continue, gap-safe (cf. services/invoiceNumbering).
+    // INVOICE_NUMBER_START = dernier n° facture.net avant bascule (à fixer par le PO avant mise en service).
+    const INVOICE_NUMBER_START = 0;
     const year = new Date().getFullYear();
-    const month = String(new Date().getMonth() + 1).padStart(2, '0');
-    const count = invoices.filter((i) => i.invoice_number.startsWith(`${year}-${month}`)).length + 1;
-    const invoiceNumber = `${year}-${month}-${String(count).padStart(3, '0')}`;
+    const month = new Date().getMonth() + 1;
+    const invoiceNumber = nextInvoiceNumber(invoices, year, INVOICE_NUMBER_START);
 
     addInvoice({
       invoice_number: invoiceNumber,
