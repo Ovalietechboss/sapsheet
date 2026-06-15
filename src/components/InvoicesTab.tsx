@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/authStore';
 import { generateCESUTemplate, generateClassicalTemplate } from '../services/InvoiceTemplates';
 import { nextInvoiceNumber } from '../services/invoiceNumbering';
 import { generateAndSharePDF } from '../utils/pdfGenerator';
+import InvoiceImportPanel from './InvoiceImportPanel';
 
 export default function InvoicesTab() {
   const { invoices, addInvoice, updateInvoice } = useInvoiceStore();
@@ -160,6 +161,8 @@ export default function InvoicesTab() {
           Cet onglet sert au <strong>suivi</strong> : statut payé/impayé, attestation fiscale.
         </p>
       </div>
+
+      <InvoiceImportPanel />
 
       {/* Invoices List */}
       <div style={{ backgroundColor: '#f5f5f5', borderRadius: '8px', padding: '20px' }}>
