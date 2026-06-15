@@ -247,6 +247,11 @@ export default function InvoicesTab() {
                     <p style={{ fontWeight: 'bold', fontSize: '18px', color: '#007AFF' }}>
                       Total: {invoice.total_amount.toFixed(2)}€
                     </p>
+                    {invoice.status === 'paid' && invoice.paid_at && (
+                      <p style={{ color: '#34C759', fontSize: '12px', marginTop: '4px' }}>
+                        💶 Encaissée le {formatDate(invoice.paid_at)}
+                      </p>
+                    )}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'stretch' }}>
                     <button
@@ -265,7 +270,14 @@ export default function InvoicesTab() {
                     </button>
                     <select
                       value={invoice.status}
-                      onChange={(e) => updateInvoice(invoice.id, { status: e.target.value as 'draft' | 'sent' | 'paid' })}
+                      onChange={(e) => {
+                        const status = e.target.value as 'draft' | 'sent' | 'paid';
+                        // « Payée » → on horodate l'encaissement (base URSSAF). Sinon on l'efface.
+                        const updates: any = { status };
+                        if (status === 'paid') { if (!invoice.paid_at) updates.paid_at = Date.now(); }
+                        else { updates.paid_at = null; }
+                        updateInvoice(invoice.id, updates);
+                      }}
                       title="Statut de la facture"
                       style={{ padding: '6px 8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' }}
                     >
@@ -273,6 +285,15 @@ export default function InvoicesTab() {
                       <option value="sent">Envoyée</option>
                       <option value="paid">Payée</option>
                     </select>
+                    {invoice.status === 'paid' && (
+                      <input
+                        type="date"
+                        value={invoice.paid_at ? new Date(invoice.paid_at).toISOString().slice(0, 10) : ''}
+                        onChange={(e) => updateInvoice(invoice.id, { paid_at: e.target.value ? new Date(e.target.value).getTime() : null })}
+                        title="Date d'encaissement"
+                        style={{ padding: '6px 8px', border: '1px solid #34C759', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' }}
+                      />
+                    )}
                   </div>
                 </div>
               </div>

@@ -20,6 +20,8 @@ export interface Invoice {
   year: number;
   /** Lignes libres (facture indépendante). Absent pour les factures issues des pointages. */
   lines?: InvoiceLine[];
+  /** Date d'encaissement (ms). Renseignée quand la facture passe en « payée » → base URSSAF. */
+  paid_at?: number | null;
   generated_at: number;
   created_at: number;
   updated_at: number;

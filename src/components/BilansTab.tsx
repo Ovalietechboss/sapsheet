@@ -69,6 +69,7 @@ export default function BilansTab() {
   const [confirmLock, setConfirmLock] = useState(false);
   const [subView, setSubView] = useState<SubView>('documents');
   const [showNova, setShowNova] = useState(false);
+  const [showUrssaf, setShowUrssaf] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; mode: 'CESU' | 'CLASSICAL' } | null>(null);
   const [confirmBulk, setConfirmBulk] = useState<{ mode: 'CESU' | 'CLASSICAL'; alreadyGen: number; pending: number } | null>(null);
   const [detailClient, setDetailClient] = useState<ClientRow | null>(null);
@@ -457,6 +458,37 @@ export default function BilansTab() {
     return { quarterLabel, months, monthsInQuarter };
   }, [timesheets, selectedMonth, selectedYear]);
 
+  // ── Données URSSAF (trimestriel) — CA ENCAISSÉ du trimestre ─────────────────
+  // Déclaration micro-entrepreneur = CA encaissé → on rattache chaque facture payée
+  // à son mois de PAIEMENT (`paid_at`), pas à sa date de facture. CESU emploi direct
+  // (non facturé) exclu de fait. Les factures payées sans date d'encaissement sont
+  // signalées (à compléter dans l'onglet Factures).
+  const urssafData = useMemo(() => {
+    const quarter = Math.floor((selectedMonth - 1) / 3);
+    const monthsInQuarter = [quarter * 3 + 1, quarter * 3 + 2, quarter * 3 + 3];
+    const quarterLabel = `T${quarter + 1} ${selectedYear}`;
+
+    const paidInvoices = invoices.filter((i) => i.status === 'paid');
+    const missingDate = paidInvoices.filter((i) => !i.paid_at).length;
+
+    const months = monthsInQuarter.map((m) => {
+      const paid = paidInvoices.filter((i) => {
+        if (!i.paid_at) return false; // sans date d'encaissement → non rattaché
+        const d = new Date(i.paid_at);
+        return d.getFullYear() === selectedYear && d.getMonth() + 1 === m;
+      });
+      const autresCA = paid.reduce((s, i) => {
+        const c = clients.find((cl) => cl.id === i.client_id);
+        return c?.client_type === 'SOCIETE' ? s + (i.total_amount || 0) : s;
+      }, 0);
+      const total = paid.reduce((s, i) => s + (i.total_amount || 0), 0);
+      return { label: MONTHS[m - 1], total, sapCA: total - autresCA, autresCA, count: paid.length };
+    });
+
+    const quarterTotal = months.reduce((s, m) => s + m.total, 0);
+    return { quarterLabel, months, quarterTotal, missingDate };
+  }, [invoices, clients, selectedMonth, selectedYear]);
+
   const formatDate = (ts: number) => new Date(ts).toLocaleDateString('fr-FR');
   const formatTime = (ts: number) => new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
@@ -567,6 +599,10 @@ export default function BilansTab() {
           </button>
         ))}
         <div style={{ flex: 1 }} />
+        <button onClick={() => setShowUrssaf(true)}
+          style={{ padding: '8px 16px', backgroundColor: '#00897B', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', alignSelf: 'center', marginBottom: '4px', marginRight: '8px' }}>
+          URSSAF
+        </button>
         <button onClick={() => setShowNova(true)}
           style={{ padding: '8px 16px', backgroundColor: '#AF52DE', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', alignSelf: 'center', marginBottom: '4px', marginRight: '8px' }}>
           NOVA
@@ -1003,6 +1039,80 @@ export default function BilansTab() {
                 style={{ flex: '1 1 100px', padding: '12px', background: '#FF9500', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
                 Tout régénérer ({confirmBulk.alreadyGen + confirmBulk.pending})
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════ MODAL URSSAF ══════ */}
+      {showUrssaf && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }} onClick={() => setShowUrssaf(false)}>
+          <div style={{ background: 'white', padding: '32px', borderRadius: '12px', width: '92%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '20px' }}>Déclaration URSSAF</h2>
+                <p style={{ margin: '4px 0 0', color: '#888', fontSize: '13px' }}>{urssafData.quarterLabel} — micro-entrepreneur</p>
+              </div>
+              <span style={{ padding: '4px 12px', backgroundColor: '#00897B22', color: '#00897B', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold', border: '1px solid #00897B44' }}>CA payé</span>
+            </div>
+
+            <p style={{ color: '#666', fontSize: '13px', marginBottom: '16px', lineHeight: '1.5' }}>
+              CA des <strong>factures marquées « payée »</strong> du trimestre (à recopier dans votre déclaration URSSAF). Pensez à tenir les statuts de factures à jour.
+            </p>
+
+            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f5f5f5' }}>
+                  <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: '12px', color: '#888', borderBottom: '2px solid #ddd' }}></th>
+                  {urssafData.months.map((m) => (
+                    <th key={m.label} style={{ padding: '10px 12px', textAlign: 'center', fontSize: '13px', fontWeight: 'bold', color: '#333', borderBottom: '2px solid #ddd' }}>{m.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ backgroundColor: '#E8F4FF' }}>
+                  <td style={{ padding: '10px 12px', fontWeight: '600', fontSize: '13px', borderBottom: '1px solid #eee' }}>Particuliers (SAP)</td>
+                  {urssafData.months.map((m) => (
+                    <td key={m.label} style={{ padding: '10px 12px', textAlign: 'center', fontSize: '15px', fontWeight: 'bold', color: '#1a6fb5', borderBottom: '1px solid #eee' }}>{m.sapCA.toFixed(2)}€</td>
+                  ))}
+                </tr>
+                <tr style={{ backgroundColor: '#F0EBFF' }}>
+                  <td style={{ padding: '10px 12px', fontWeight: '600', fontSize: '13px', borderBottom: '1px solid #eee' }}>Sociétés (B2B)</td>
+                  {urssafData.months.map((m) => (
+                    <td key={m.label} style={{ padding: '10px 12px', textAlign: 'center', fontSize: '15px', fontWeight: 'bold', color: '#5b3db5', borderBottom: '1px solid #eee' }}>{m.autresCA.toFixed(2)}€</td>
+                  ))}
+                </tr>
+                <tr style={{ backgroundColor: '#EBF9F0', borderTop: '2px solid #00897B' }}>
+                  <td style={{ padding: '10px 12px', fontWeight: '600', fontSize: '13px', color: '#00695C' }}>CA payé du mois</td>
+                  {urssafData.months.map((m) => (
+                    <td key={m.label} style={{ padding: '10px 12px', textAlign: 'center', fontSize: '18px', fontWeight: 'bold', color: '#00695C' }}>{m.total.toFixed(2)}€</td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+
+            <div style={{ background: '#EBF9F0', border: '1px solid #00897B', borderRadius: '8px', padding: '12px 16px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 'bold', color: '#00695C', fontSize: '14px' }}>Total CA payé {urssafData.quarterLabel}</span>
+              <span style={{ fontWeight: 'bold', color: '#00695C', fontSize: '22px' }}>{urssafData.quarterTotal.toFixed(2)}€</span>
+            </div>
+
+            <div style={{ background: '#FFF8E7', border: '1px solid #FFCC00', borderRadius: '8px', padding: '10px 14px', marginBottom: '20px', fontSize: '12px', color: '#856400' }}>
+              CA rattaché au mois de <strong>paiement</strong> (date d'encaissement). Les CESU en emploi direct (non facturés) ne sont pas comptés ici. Vérifiez avant déclaration.
+              {urssafData.missingDate > 0 && (
+                <div style={{ marginTop: '6px', fontWeight: 'bold', color: '#b36b00' }}>
+                  ⚠️ {urssafData.missingDate} facture(s) « payée » sans date d'encaissement → renseignez-la dans l'onglet Factures pour qu'elles soient comptées.
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setShowUrssaf(false)} style={{ flex: 1, padding: '12px', background: '#f5f5f5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                Fermer
+              </button>
+              <a href="https://www.autoentrepreneur.urssaf.fr/" target="_blank" rel="noopener noreferrer"
+                style={{ flex: 1, padding: '12px', background: '#00897B', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', textAlign: 'center', textDecoration: 'none', display: 'block' }}>
+                Ouvrir URSSAF
+              </a>
             </div>
           </div>
         </div>
