@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { consolidateInvoiceImport, findImportOverlaps } from '../invoiceImport';
+import { consolidateInvoiceImport, findImportOverlaps, supersededByManual } from '../invoiceImport';
 import type { ReconstructedInvoice } from '../invoiceHistoryReconstruction';
 
 const dom = (clientId: string, clientName: string, month: number, date: string, amount: number): ReconstructedInvoice => ({
@@ -34,14 +34,17 @@ describe('consolidateInvoiceImport', () => {
     expect(res[0].newNumber).toBe('2026-005 (FAC-2026-03-Prats)');
   });
 
-  it('findImportOverlaps : alerte recouvrement entre sources + déjà existant', () => {
-    const consolidated = consolidateInvoiceImport({
-      year: 2026,
-      domitemps: [dom('c1', 'Prats', 3, '2026-03-31', 200)],
-      manual: [{ oldNumber: 'F-9', date: new Date('2026-03-15').getTime(), clientId: 'c1', clientName: 'Prats', amount: 50, paid: false }],
-    });
+  it('facture.net prioritaire : dédoublonne (client×mois), DomiTemps écartée', () => {
+    const domPrats = dom('c1', 'Prats', 3, '2026-03-31', 200);
+    const manualPrats = { oldNumber: 'F-9', date: new Date('2026-03-15').getTime(), clientId: 'c1', clientName: 'Prats', amount: 50, paid: true };
+    const consolidated = consolidateInvoiceImport({ year: 2026, domitemps: [domPrats], manual: [manualPrats] });
+    expect(consolidated).toHaveLength(1);              // une seule (pas de doublon)
+    expect(consolidated[0].source).toBe('facture.net'); // facture.net retenue
+    expect(consolidated[0].amount).toBe(50);
+    expect(supersededByManual([domPrats], [manualPrats])).toHaveLength(1); // DomiTemps écartée
+
     const warns = findImportOverlaps(consolidated, [{ client_id: 'c1', month: 3, year: 2026 }]);
-    expect(warns.some((w) => w.includes('Doublon'))).toBe(true);
-    expect(warns.some((w) => w.includes('Déjà dans Factures'))).toBe(true);
+    expect(warns.some((w) => w.includes('Doublon'))).toBe(false);          // recouvrement résolu
+    expect(warns.some((w) => w.includes('Déjà dans Factures'))).toBe(true); // mais déjà en base = alerte
   });
 });

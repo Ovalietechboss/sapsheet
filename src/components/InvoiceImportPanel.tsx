@@ -4,7 +4,7 @@ import { useTimesheetStore } from '../stores/timesheetStore.supabase';
 import { useClientStore } from '../stores/clientStore.supabase';
 import { useBillingPeriodStore } from '../stores/billingPeriodStore.supabase';
 import { reconstructDomiTempsInvoiceHistory } from '../services/invoiceHistoryReconstruction';
-import { consolidateInvoiceImport, findImportOverlaps, type ManualLegacyInvoice } from '../services/invoiceImport';
+import { consolidateInvoiceImport, findImportOverlaps, supersededByManual, type ManualLegacyInvoice } from '../services/invoiceImport';
 
 /**
  * Écran de reprise/import de l'historique 2026 :
@@ -39,6 +39,7 @@ export default function InvoiceImportPanel() {
     [domitemps, manual, year],
   );
   const overlaps = useMemo(() => findImportOverlaps(consolidated, invoices), [consolidated, invoices]);
+  const superseded = useMemo(() => supersededByManual(domitemps, manual), [domitemps, manual]);
 
   const fmtDate = (ts: number) => new Date(ts).toLocaleDateString('fr-FR');
 
@@ -115,6 +116,13 @@ export default function InvoiceImportPanel() {
             <p style={{ fontSize: '12px', color: '#666' }}>{manual.length} facture(s) facture.net saisie(s).
               <button onClick={() => setManual([])} style={{ marginLeft: '8px', fontSize: '12px', cursor: 'pointer' }}>tout effacer</button>
             </p>
+          )}
+
+          {/* Info : DomiTemps écartées car couvertes par facture.net (facture.net prioritaire) */}
+          {superseded.length > 0 && (
+            <div style={{ background: '#e8f5e9', border: '1px solid #43a047', borderRadius: '6px', padding: '8px 10px', margin: '10px 0', fontSize: '13px', color: '#1b5e20' }}>
+              ℹ️ {superseded.length} facture(s) DomiTemps écartée(s) car couverte(s) par facture.net : {superseded.map((s) => `${s.clientName} ${s.month}/${s.year}`).join(', ')}.
+            </div>
           )}
 
           {/* Alertes anti-doublon */}

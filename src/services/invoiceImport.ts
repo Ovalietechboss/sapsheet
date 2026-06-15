@@ -28,14 +28,33 @@ export interface ConsolidatedInvoice {
   source: 'domitemps' | 'facture.net';
 }
 
+const manualKey = (clientId: string, dateMs: number) => {
+  const d = new Date(dateMs);
+  return `${clientId}|${d.getMonth() + 1}|${d.getFullYear()}`;
+};
+
+/** Reconstructions DomiTemps écartées car couvertes par une facture.net (même client × mois). */
+export function supersededByManual(
+  domitemps: ReadonlyArray<ReconstructedInvoice>,
+  manual: ReadonlyArray<ManualLegacyInvoice>,
+): ReconstructedInvoice[] {
+  const keys = new Set(manual.map((m) => manualKey(m.clientId, m.date)));
+  return domitemps.filter((d) => keys.has(`${d.clientId}|${d.month}|${d.year}`));
+}
+
 export function consolidateInvoiceImport(params: {
   domitemps: ReadonlyArray<ReconstructedInvoice>;
   manual: ReadonlyArray<ManualLegacyInvoice>;
   year: number;
   startSeq?: number; // défaut 1
 }): ConsolidatedInvoice[] {
+  // facture.net prioritaire : on écarte la reconstruction DomiTemps d'un (client × mois)
+  // déjà couvert par une facture.net saisie (= la vraie facture émise) → pas de doublon.
+  const manualKeys = new Set(params.manual.map((m) => manualKey(m.clientId, m.date)));
+  const domFiltered = params.domitemps.filter((d) => !manualKeys.has(`${d.clientId}|${d.month}|${d.year}`));
+
   const merged = [
-    ...params.domitemps.map((d) => ({
+    ...domFiltered.map((d) => ({
       clientId: d.clientId, clientName: d.clientName, month: d.month, year: d.year,
       amount: d.amount, date: d.date, oldNumber: d.oldNumber,
       status: 'sent' as const, source: 'domitemps' as const,
