@@ -93,6 +93,14 @@ export default function ClientsTab() {
         await addClient(data);
       }
       setClientModal(null);
+    } catch (err: any) {
+      console.error('Enregistrement client échoué:', err);
+      const msg = err?.message || String(err);
+      // Cause la plus probable : migration clients (client_type/company_*) non appliquée.
+      const hint = /column .* does not exist|client_type|company_/i.test(msg)
+        ? "\n\nLa migration « clients » (colonnes type société) n'est pas encore appliquée en base."
+        : '';
+      alert(`Échec de l'enregistrement : ${msg}${hint}`);
     } finally {
       setSaving(false);
     }
