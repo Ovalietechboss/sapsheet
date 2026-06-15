@@ -20,6 +20,7 @@ export default function InvoicesTab() {
   const [creditModal, setCreditModal] = useState<any | null>(null);
   const [creditForm, setCreditForm] = useState({ amount: '', reason: '', date: '' });
   const [creatingCredit, setCreatingCredit] = useState(false);
+  const [onlyUnpaid, setOnlyUnpaid] = useState(false);
 
   const openCreditModal = (invoice: any) => {
     const today = new Date();
@@ -226,6 +227,19 @@ export default function InvoicesTab() {
     }
   };
 
+  // ── Impayés (FAC-05) : factures « envoyée » non payées (avoirs négatifs exclus) ──
+  const DAY = 86400000;
+  const nowMs = Date.now();
+  const OVERDUE_DAYS = 30; // au-delà → considéré en retard
+  const unpaid = invoices.filter((i) => i.status === 'sent' && (i.total_amount || 0) > 0);
+  const unpaidTotal = unpaid.reduce((s, i) => s + (i.total_amount || 0), 0);
+  const overdueCount = unpaid.filter((i) => (nowMs - (i.generated_at || i.created_at || nowMs)) > OVERDUE_DAYS * DAY).length;
+  const ageDays = (i: any) => Math.floor((nowMs - (i.generated_at || i.created_at || nowMs)) / DAY);
+
+  const displayedInvoices = onlyUnpaid
+    ? [...unpaid].sort((a, b) => (a.generated_at || 0) - (b.generated_at || 0)) // impayés : plus ancien d'abord
+    : invoices;
+
   return (
     <div>
       <div style={{ marginBottom: '24px' }}>
@@ -238,13 +252,35 @@ export default function InvoicesTab() {
 
       <InvoiceImportPanel />
 
+      {/* Impayés (FAC-05) : synthèse + filtre */}
+      {unpaid.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', background: '#FFF4E5', border: '1px solid #FF9500', borderRadius: '10px', padding: '14px 18px', marginBottom: '16px' }}>
+          <div>
+            <div style={{ fontWeight: 'bold', color: '#b36b00', fontSize: '15px' }}>
+              💰 Impayé : {unpaidTotal.toFixed(2)} € · {unpaid.length} facture{unpaid.length > 1 ? 's' : ''} envoyée{unpaid.length > 1 ? 's' : ''}
+            </div>
+            {overdueCount > 0 && (
+              <div style={{ color: '#FF3B30', fontSize: '13px', fontWeight: 600, marginTop: '2px' }}>
+                ⚠️ {overdueCount} en retard (&gt; {OVERDUE_DAYS} jours)
+              </div>
+            )}
+          </div>
+          <button onClick={() => setOnlyUnpaid((v) => !v)}
+            style={{ padding: '9px 16px', backgroundColor: onlyUnpaid ? '#FF9500' : 'white', color: onlyUnpaid ? 'white' : '#b36b00', border: '1px solid #FF9500', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px' }}>
+            {onlyUnpaid ? 'Voir toutes les factures' : 'Voir les impayés'}
+          </button>
+        </div>
+      )}
+
       {/* Invoices List */}
       <div style={{ backgroundColor: '#f5f5f5', borderRadius: '8px', padding: '20px' }}>
         {invoices.length === 0 ? (
           <p style={{ textAlign: 'center', color: '#999' }}>No invoices yet. Generate your first one!</p>
+        ) : displayedInvoices.length === 0 ? (
+          <p style={{ textAlign: 'center', color: '#999' }}>Aucune facture impayée 🎉</p>
         ) : (
           <div style={{ display: 'grid', gap: '16px' }}>
-            {invoices.map((invoice) => (
+            {displayedInvoices.map((invoice) => (
               <div
                 key={invoice.id}
                 style={{
@@ -274,6 +310,11 @@ export default function InvoicesTab() {
                       }}>
                         {invoice.status === 'draft' ? 'BROUILLON' : invoice.status === 'sent' ? 'ENVOYÉE' : 'PAYÉE'}
                       </span>
+                      {invoice.status === 'sent' && (invoice.total_amount || 0) > 0 && ageDays(invoice) > OVERDUE_DAYS && (
+                        <span style={{ backgroundColor: '#FF3B30', color: 'white', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
+                          EN RETARD · {ageDays(invoice)}j
+                        </span>
+                      )}
                       {invoice.facturation_mode && (
                         <span style={{ 
                           backgroundColor: '#5856D6',
