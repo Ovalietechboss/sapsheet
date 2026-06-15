@@ -8,6 +8,7 @@ import DashboardTab from '../components/DashboardTab';
 import TimesheetsTab from '../components/TimesheetsTab';
 import ClientsTab from '../components/ClientsTab';
 import BilansTab from '../components/BilansTab';
+import InvoicesTab from '../components/InvoicesTab';
 import ProfileTab from '../components/ProfileTab';
 
 export default function HomePage() {
@@ -24,6 +25,7 @@ export default function HomePage() {
     { id: 'timesheets', label: '📋 Pointages', icon: '📋' },
     { id: 'clients', label: '👥 Clients', icon: '👥' },
     { id: 'bilans', label: '📊 Bilans', icon: '📊' },
+    { id: 'factures', label: '🧾 Factures', icon: '🧾' },
     { id: 'profile', label: '⚙️ Profil', icon: '⚙️' },
   ];
 
@@ -46,6 +48,8 @@ export default function HomePage() {
         return <ClientsTab />;
       case 'bilans':
         return <BilansTab />;
+      case 'factures':
+        return <InvoicesTab />;
       case 'profile':
         return <ProfileTab />;
       default:
