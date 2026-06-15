@@ -139,10 +139,25 @@ export default function InvoicesTab() {
 
       console.log('Invoice data passed to template:', invoiceData);
 
+      // Le template attend des champs camelCase ; le store User est en snake_case → on mappe
+      // (sinon "Votre contact : undefined", display_name n'étant pas lu).
+      const userForTemplate = {
+        displayName: user.display_name,
+        email: user.email,
+        address: user.address,
+        phone: user.phone,
+        cesuNumber: user.cesu_number,
+        siren: user.siren,
+        siret: user.siret,
+        businessName: user.business_name,
+        businessAddress: user.business_address,
+        iban: user.iban,
+        bic: user.bic,
+      };
       const htmlContent =
         mode === 'CESU'
-          ? generateCESUTemplate(invoiceData, client, invoiceTimesheets, user)
-          : generateClassicalTemplate(invoiceData, client, invoiceTimesheets, user);
+          ? generateCESUTemplate(invoiceData, client, invoiceTimesheets, userForTemplate)
+          : generateClassicalTemplate(invoiceData, client, invoiceTimesheets, userForTemplate);
 
       await generateAndSharePDF(htmlContent, `invoice_${invoice.invoice_number}.pdf`);
     } catch (error: any) {
