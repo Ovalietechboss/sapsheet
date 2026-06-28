@@ -3,8 +3,9 @@ import { loadDataset } from './data/queries';
 import { indexDataset, type Indexed } from './data/metrics';
 import Dashboard from './components/Dashboard';
 import Explorer from './components/Explorer';
+import Reports from './components/Reports';
 
-type Tab = 'dashboard' | 'explorer';
+type Tab = 'dashboard' | 'reports' | 'explorer';
 type LoadState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
@@ -37,6 +38,9 @@ export default function App() {
         <button className={`tab ${tab === 'dashboard' ? 'active' : ''}`} onClick={() => setTab('dashboard')}>
           Tableau de bord
         </button>
+        <button className={`tab ${tab === 'reports' ? 'active' : ''}`} onClick={() => setTab('reports')}>
+          Rapports
+        </button>
         <button className={`tab ${tab === 'explorer' ? 'active' : ''}`} onClick={() => setTab('explorer')}>
           Exploration ad-hoc
         </button>
@@ -49,8 +53,13 @@ export default function App() {
           <div style={{ marginTop: 8 }}>{state.message}</div>
         </div>
       )}
-      {state.status === 'ready' &&
-        (tab === 'dashboard' ? <Dashboard ds={state.ds} /> : <Explorer ds={state.ds} />)}
+      {state.status === 'ready' && (
+        <>
+          {tab === 'dashboard' && <Dashboard ds={state.ds} />}
+          {tab === 'reports' && <Reports ds={state.ds} />}
+          {tab === 'explorer' && <Explorer ds={state.ds} />}
+        </>
+      )}
     </div>
   );
 }

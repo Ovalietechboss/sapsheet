@@ -7,20 +7,27 @@
 
 Domms / **DomiTemps** est une application de gestion de temps et de facturation
 pour les services à la personne (SAP). Aujourd'hui, la restitution analytique
-(tableaux de bord, rapports, exploration des données) repose sur **DigDash**, un
-outil de BI externe — coûteux, lourd à maintenir et déconnecté du produit.
+repose sur **deux outils externes** :
 
-On veut **remplacer DigDash par un module de reporting natif** qui lit
-directement les données Domms dans Supabase.
+- **DigDash** — plateforme de BI : tableaux de bord interactifs et exploration.
+- **BIRT** (Business Intelligence Reporting Tool) — moteur de **reporting
+  documentaire** : rapports paginés, structurés, groupés avec sous-totaux,
+  paramétrables, exportés en PDF/Excel.
+
+Les deux sont coûteux, lourds à maintenir et déconnectés du produit. On veut les
+**remplacer par un module de reporting natif** qui lit directement les données
+Domms dans Supabase, et qui couvre les **deux usages** : BI (DigDash) ET
+reporting documentaire (BIRT).
 
 ## 2. Objectifs (esprit BMAD — value first)
 
-| # | Objectif | Mesure de succès |
-|---|----------|------------------|
-| O1 | Dashboards interactifs | KPIs + graphes filtrables par période, sans DigDash |
-| O2 | Rapports PDF/Excel | Génération à la demande, puis planifiée (mensuel/trimestriel) |
-| O3 | Exploration ad-hoc | L'utilisateur croise mesure × dimension sans dev |
-| O4 | Coût & autonomie | Suppression de la licence DigDash |
+| # | Objectif | Remplace | Mesure de succès |
+|---|----------|----------|------------------|
+| O1 | Dashboards interactifs | DigDash | KPIs + graphes filtrables par période |
+| O2 | Rapports documentaires paginés | **BIRT** | Rapports paramétrés, groupés, sous-totaux, PDF/Excel |
+| O3 | Exploration ad-hoc | DigDash | L'utilisateur croise mesure × dimension sans dev |
+| O4 | Rapports planifiés | BIRT/DigDash | Génération récurrente (mensuel/trimestriel) + email |
+| O5 | Coût & autonomie | Les deux | Suppression des licences DigDash + BIRT |
 
 Hors périmètre v1 : reporting réglementaire NOVA/URSSAF (déjà couvert côté app
 principale via `BilansTab` / `attestationFiscale`).
@@ -61,15 +68,21 @@ attente, nb factures.
 
 ## 5. User stories (backlog priorisé)
 
-- **US1 — Dashboard interactif** *(MVP, ce commit)* : KPIs du mois, évolution
-  12 mois (heures + CA), répartition CESU/Classique, top clients, statut
-  factures, filtre par année. ✅
-- **US2 — Export à la demande** *(MVP, ce commit)* : export du dashboard et des
+- **US1 — Dashboard interactif** *(livré)* : KPIs du mois, évolution
+  (heures + CA), répartition CESU/Classique, top clients, statut
+  factures, filtre par année. ✅ *(remplace DigDash)*
+- **US2 — Export à la demande** *(livré)* : export du dashboard et des
   tables en **PDF** et **Excel**. ✅
-- **US3 — Explorateur ad-hoc** *(MVP, ce commit)* : choix mesure × dimension ×
-  type de graphe, table + export. ✅
+- **US3 — Explorateur ad-hoc** *(livré)* : choix mesure × dimension ×
+  type de graphe, table + export. ✅ *(remplace DigDash)*
+- **US6 — Rapports documentaires paginés** *(livré)* : catalogue de rapports
+  paramétrables (relevé d'activité, journal de facturation, synthèse par
+  mandataire, détail des interventions), structure en bandes avec
+  groupes + sous-totaux + total général, aperçu écran et export PDF paginé /
+  Excel structuré. ✅ *(remplace BIRT)*
 - **US4 — Rapports planifiés** *(itération suivante)* : Supabase Edge Function +
-  cron (mensuel/trimestriel), envoi email (Resend, déjà utilisé dans Domms).
+  cron (mensuel/trimestriel), envoi email (Resend, déjà utilisé dans Domms),
+  réutilise le moteur de rapports d'US6.
 - **US5 — Auth & RLS** *(itération suivante)* : connexion utilisateur, cloisonnement
   par `user_id`, partage de dashboards.
 
