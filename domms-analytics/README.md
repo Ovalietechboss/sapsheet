@@ -5,7 +5,7 @@ de **DigDash** (BI / dashboards) et de **BIRT** (reporting documentaire paginé)
 Application séparée (Vite + React + TypeScript) qui lit les données Domms via
 l'API Supabase, en **lecture seule**.
 
-Voir le cadrage : [`../docs/digdash-replacement/PRD.md`](../docs/digdash-replacement/PRD.md).
+Voir le cadrage : [`docs/PRD.md`](docs/PRD.md).
 
 ## Fonctionnalités (v0.1)
 
