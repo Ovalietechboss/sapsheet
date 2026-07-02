@@ -1,4 +1,4 @@
-# Project Brief — LocaTerrain (nom de code provisoire)
+# Project Brief — Kizy
 
 > Logiciel de gestion locative pour bailleurs particuliers, **mobile-first**, avec état des lieux photo + inventaire + signature sur le terrain.
 > Premier artefact BMAD (phase Analyst). À valider avant de passer au PRD (phase PM).
@@ -7,7 +7,7 @@
 
 ## 1. Executive Summary
 
-**LocaTerrain** est une application de **gestion des locations pour particuliers** (SaaS multi-bailleurs), qui vise à faire aussi bien que Rentila sur la gestion locative « bureau » (biens, locataires, baux, loyers, fiscalité) **tout en le dépassant nettement sur le terrain mobile** : état des lieux avec photos par pièce, inventaire du mobilier, et **signature manuscrite des documents directement sur le mobile**, y compris **hors-ligne**.
+**Kizy** est une application de **gestion des locations pour particuliers** (SaaS multi-bailleurs), qui vise à faire aussi bien que Rentila sur la gestion locative « bureau » (biens, locataires, baux, loyers, fiscalité) **tout en le dépassant nettement sur le terrain mobile** : état des lieux avec photos par pièce, inventaire du mobilier, et **signature manuscrite des documents directement sur le mobile**, y compris **hors-ligne**.
 
 Le produit capitalise sur une base technique existante (React + TypeScript + **Capacitor** iOS/Android + **Supabase** + génération **PDF** + **caméra/filesystem/share** déjà intégrés), ce qui accélère fortement la partie mobile.
 
@@ -82,9 +82,9 @@ Une app **mobile-first** (et web) qui couvre le cycle complet du bailleur :
 - Gestion de mandats pro / agences (multi-bailleurs gérés par un tiers).
 - Encaissement/paiement en ligne intégré (Stripe, prélèvement SEPA).
 
-## 7. Cartographie Rentila → LocaTerrain
+## 7. Cartographie Rentila → Kizy
 
-| Domaine Rentila | LocaTerrain | Jalon | Différenciation |
+| Domaine Rentila | Kizy | Jalon | Différenciation |
 |---|---|---|---|
 | Biens / lots | ✅ | 1 | Photos natives mobile |
 | Locataires / garants | ✅ | 1 | — |
@@ -120,7 +120,7 @@ Devenir l'outil de référence du bailleur particulier français « du terrain �
 - **Marché France** (IRL INSEE, loi 89-462, mentions légales bail, DPE, régimes fiscaux FR).
 - Mono-langue **français** en v1.
 - Budget prestataire signature eIDAS **différé** (jalon 3).
-- **Nouveau repo dédié** `LocaTerrain` ; les briques réutilisables de `sapsheet`/DomiTemps (auth Supabase, RLS, PDF, caméra/filesystem/share, offline `idb`, email Edge Function) sont **copiées et adaptées**, pas partagées.
+- **Nouveau repo dédié** `Kizy` ; les briques réutilisables de `sapsheet`/DomiTemps (auth Supabase, RLS, PDF, caméra/filesystem/share, offline `idb`, email Edge Function) sont **copiées et adaptées**, pas partagées.
 - **SaaS par abonnement** : la tarification impacte les quotas (biens, stockage photos) et le portail locataire.
 
 ## 11. Risks & Open Questions
@@ -134,11 +134,12 @@ Devenir l'outil de référence du bailleur particulier français « du terrain �
 - ✅ **Colocation** : gestion des **quotes-parts de loyer par colocataire dès le Jalon 1**.
 - ✅ **Photos** : stockage **Supabase Storage** avec **quota par bailleur** (valeur à caler selon l'offre d'abonnement).
 - ✅ **Modèle économique** : **abonnement** (SaaS payant, pas de mode gratuit prévu ; freemium éventuel à débattre).
-- ✅ **Dépôt** : **nouveau repo dédié** `LocaTerrain` — DomiTemps (`sapsheet`) reste intact ; on y **copie les briques réutilisables** (auth, PDF, caméra, offline, RLS).
+- ✅ **Dépôt** : **nouveau repo dédié** `kizy` — DomiTemps (`sapsheet`) reste intact ; on y **copie les briques réutilisables** (auth, PDF, caméra, offline, RLS).
+- ✅ **Nom du produit** : **Kizy** (évoque *keys*/clés). `kizy.com` pris par Kizy Tracking (IoT, autre secteur) → viser `kizy.fr`/`kizy.app` + dépôt marque INPI classes 9 & 36 à sécuriser.
 
 **Questions encore ouvertes (à trancher au PRD)**
-1. **Nom définitif** du produit + charte / logo (en discussion).
-2. Palier(s) d'abonnement et quotas associés (nb de biens, Go de photos).
+1. Palier(s) d'abonnement et quotas associés (nb de biens, Go de photos).
+2. Charte graphique / logo Kizy.
 
 ## 12. Next Steps (workflow BMAD)
 
