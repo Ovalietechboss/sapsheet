@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useInvoiceStore } from '../stores/invoiceStore.supabase';
 import { useTimesheetStore } from '../stores/timesheetStore.supabase';
 import { useClientStore } from '../stores/clientStore.supabase';
+import { useMandataireStore } from '../stores/mandataireStore.supabase';
 import { useAuthStore } from '../stores/authStore';
 import { generateCESUTemplate, generateClassicalTemplate } from '../services/InvoiceTemplates';
 import { nextInvoiceNumber, nextCreditNumber } from '../services/invoiceNumbering';
@@ -13,7 +14,12 @@ export default function InvoicesTab() {
   const { invoices, addInvoice, updateInvoice } = useInvoiceStore();
   const { timesheets } = useTimesheetStore();
   const { clients, getContactsForClient } = useClientStore();
+  const { getMandataireById, hydrateMandataires } = useMandataireStore();
   const { user } = useAuthStore();
+
+  // Les mandataires ne sont pas hydratés globalement : on les charge ici pour que
+  // l'envoi puisse résoudre le destinataire d'un client rattaché à un mandataire.
+  useEffect(() => { hydrateMandataires(); }, [hydrateMandataires]);
   const [showModal, setShowModal] = useState(false);
   const [selectedTimesheets, setSelectedTimesheets] = useState<string[]>([]);
   const [selectedMode, setSelectedMode] = useState<'CESU' | 'CLASSICAL'>('CESU');
@@ -242,8 +248,12 @@ export default function InvoicesTab() {
     const client = clients.find((c) => c.id === invoice.client_id);
     if (!client) { alert('Client non trouvé'); return; }
     const contacts = getContactsForClient(invoice.client_id);
-    const to = client.email || contacts[0]?.email;
-    if (!to) { alert("Aucun email destinataire (renseignez l'email du client ou un contact)."); return; }
+    // Client rattaché à un mandataire → la facture part AU MANDATAIRE (ex. CESU géré par l'association).
+    // Sinon fallback sur l'email du client, puis sur le 1er destinataire supplémentaire.
+    const mandataire = client.mandataire_id ? getMandataireById(client.mandataire_id) : null;
+    const to = mandataire?.email || client.email || contacts[0]?.email;
+    if (!to) { alert("Aucun email destinataire (renseignez le mandataire, l'email du client ou un destinataire supplémentaire)."); return; }
+    // Destinataires supplémentaires = en copie (cc), en plus du destinataire principal.
     const cc = contacts.map((c) => c.email).filter((e) => e && e !== to);
     const isCredit = !!invoice.credit_of;
     if (!window.confirm(`Envoyer ${isCredit ? "l'avoir" : 'la facture'} ${invoice.invoice_number} à ${to} ?`)) return;
