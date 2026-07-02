@@ -56,7 +56,7 @@ Une app **mobile-first** (et web) qui couvre le cycle complet du bailleur :
 ### 🟢 Jalon 1 — MVP (à livrer en premier)
 - **Auth & multi-tenant** : compte bailleur, isolation des données par RLS (base déjà en place).
 - **Biens** : résidentiel **nu** + **meublé**, parking/garage. Fiche, caractéristiques, photos.
-- **Locataires & garants** : fiches, colocation simple.
+- **Locataires & garants** : fiches, **colocation avec quotes-parts de loyer par colocataire**.
 - **Baux** : création bail nu/meublé, loyer+charges+dépôt, dates, PDF.
 - **État des lieux (cœur du différenciateur)** : entrée/sortie, pièce par pièce, **photos rattachées**, notation état, commentaires.
 - **Inventaire meublé** rattaché au bien/bail.
@@ -120,7 +120,8 @@ Devenir l'outil de référence du bailleur particulier français « du terrain �
 - **Marché France** (IRL INSEE, loi 89-462, mentions légales bail, DPE, régimes fiscaux FR).
 - Mono-langue **français** en v1.
 - Budget prestataire signature eIDAS **différé** (jalon 3).
-- Réutilisation du repo existant `sapsheet` comme socle technique (nouveau produit dérivé).
+- **Nouveau repo dédié** `LocaTerrain` ; les briques réutilisables de `sapsheet`/DomiTemps (auth Supabase, RLS, PDF, caméra/filesystem/share, offline `idb`, email Edge Function) sont **copiées et adaptées**, pas partagées.
+- **SaaS par abonnement** : la tarification impacte les quotas (biens, stockage photos) et le portail locataire.
 
 ## 11. Risks & Open Questions
 
@@ -129,12 +130,15 @@ Devenir l'outil de référence du bailleur particulier français « du terrain �
 - Valeur juridique de la signature manuscrite → suffisante entre particuliers, mais à documenter (horodatage, intégrité).
 - Périmètre très large (tout coché) → risque de dispersion ; le phasage doit être tenu.
 
-**Questions ouvertes (à trancher au PRD)**
-1. Nom définitif du produit + charte / logo ?
-2. Colocation : gestion des quotes-parts de loyer par colocataire dès le J1 ou plus tard ?
-3. Stockage des photos : Supabase Storage (coût/volume) vs autre ? Quota par bailleur ?
-4. Modèle de tarification du SaaS (gratuit/freemium/abonnement) — impacte les quotas et le portail.
-5. Le repo `sapsheet` (DomiTemps) est-il **transformé** en LocaTerrain, ou **forké** dans un repo dédié ?
+**Décisions prises (2026-07)**
+- ✅ **Colocation** : gestion des **quotes-parts de loyer par colocataire dès le Jalon 1**.
+- ✅ **Photos** : stockage **Supabase Storage** avec **quota par bailleur** (valeur à caler selon l'offre d'abonnement).
+- ✅ **Modèle économique** : **abonnement** (SaaS payant, pas de mode gratuit prévu ; freemium éventuel à débattre).
+- ✅ **Dépôt** : **nouveau repo dédié** `LocaTerrain` — DomiTemps (`sapsheet`) reste intact ; on y **copie les briques réutilisables** (auth, PDF, caméra, offline, RLS).
+
+**Questions encore ouvertes (à trancher au PRD)**
+1. **Nom définitif** du produit + charte / logo (en discussion).
+2. Palier(s) d'abonnement et quotas associés (nb de biens, Go de photos).
 
 ## 12. Next Steps (workflow BMAD)
 
