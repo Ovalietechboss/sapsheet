@@ -4,12 +4,15 @@
 // Secrets à définir (Edge Functions → Secrets) :
 //   RESEND_API_KEY      = re_xxx
 //   INVOICE_FROM_EMAIL  = "Bigorre Aide <facture@bigorre-aide.fr>"
+//   INVOICE_BCC_EMAIL   = adresse recevant une copie (BCC) de chaque envoi — archive. Optionnel.
 //
 // Le client appelle : supabase.functions.invoke('send-invoice', { body: {...} })
-// Body attendu : { to, cc?, subject, message, pdfBase64, filename }
+// Body attendu : { to, cc?, bcc?, subject, message, pdfBase64, filename }
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const FROM = Deno.env.get('INVOICE_FROM_EMAIL') || 'DomiTemps <onboarding@resend.dev>';
+// Copie cachée systématique (archive de tous les envois). Vide = pas de copie.
+const BCC = Deno.env.get('INVOICE_BCC_EMAIL');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,10 +27,16 @@ Deno.serve(async (req) => {
     if (!RESEND_API_KEY) {
       return json({ error: 'RESEND_API_KEY non configurée (Edge Functions → Secrets).' }, 500);
     }
-    const { to, cc, subject, message, pdfBase64, filename } = await req.json();
+    const { to, cc, bcc, subject, message, pdfBase64, filename } = await req.json();
     if (!to || !pdfBase64) {
       return json({ error: 'Champs requis manquants (to, pdfBase64).' }, 400);
     }
+
+    // BCC = copie d'archive du secret + éventuel bcc passé dans le body, dédupliqués.
+    const bccList = [...new Set([
+      ...(BCC ? [BCC] : []),
+      ...(Array.isArray(bcc) ? bcc : bcc ? [bcc] : []),
+    ])];
 
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -39,6 +48,7 @@ Deno.serve(async (req) => {
         from: FROM,
         to: [to],
         cc: Array.isArray(cc) && cc.length ? cc : undefined,
+        bcc: bccList.length ? bccList : undefined,
         subject: subject || 'Votre facture',
         html: (message || 'Veuillez trouver votre facture en pièce jointe.').replace(/\n/g, '<br/>'),
         attachments: [{ filename: filename || 'facture.pdf', content: pdfBase64 }],

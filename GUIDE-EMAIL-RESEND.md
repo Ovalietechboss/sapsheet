@@ -25,6 +25,9 @@ supabase functions deploy send-invoice
 supabase secrets set RESEND_API_KEY=re_xxxxxxxx
 supabase secrets set INVOICE_FROM_EMAIL="Cathy <facture@ton-domaine.fr>"
 # (si pas de domaine vérifié, mettre : "DomiTemps <onboarding@resend.dev>")
+
+# Copie (BCC) archivée de chaque facture/avoir envoyé — optionnel mais recommandé.
+supabase secrets set INVOICE_BCC_EMAIL=copie@exemple.fr
 ```
 
 ## 4. Migration SQL (suivi de l'envoi)
@@ -41,5 +44,6 @@ ALTER TABLE invoices ADD COLUMN IF NOT EXISTS sent_at BIGINT;
 ## Notes
 - Le PDF est généré **côté client** (comme le bouton PDF) puis envoyé en pièce jointe à la fonction, qui le relaie à Resend. La fonction ne rend pas le PDF elle-même.
 - Destinataire = email du client (à défaut, 1er contact) ; les autres contacts sont mis en copie (cc).
+- **Copie d'archive** : si le secret `INVOICE_BCC_EMAIL` est défini, chaque envoi dépose une copie **cachée (BCC)** dans cette boîte — même corps + même PDF. Le client ne la voit pas. Vide = pas de copie.
 - À l'envoi : `sent_at` est horodaté et le statut passe `brouillon → envoyée` (une facture déjà payée garde son statut).
 - Sécurité : ne jamais committer la clé `re_...` (elle vit uniquement dans les secrets Supabase).
