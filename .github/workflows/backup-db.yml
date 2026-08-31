@@ -10,24 +10,55 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Install postgresql-client
+      # Le client pg_dump doit être >= à la version du serveur, sinon il refuse de tourner.
+      # Supabase est passé à Postgres 17 : le client 16 abandonnait avec « server version
+      # mismatch » (backups vides du 27/06 au 31/08/2026, sans que le job vire au rouge).
+      # On installe depuis le dépôt officiel PGDG pour ne pas dépendre de ce que l'image
+      # du runner embarque à un instant donné.
+      - name: Install postgresql-client 17
         run: |
+          set -euo pipefail
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
+          echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
           sudo apt-get update
-          sudo apt-get install -y postgresql-client-16
+          sudo apt-get install -y postgresql-client-17
+          pg_dump --version
 
       - name: Dump database
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
+          # pipefail est INDISPENSABLE : sans lui, le code retour de « pg_dump | gzip » est
+          # celui de gzip, qui réussit même sur une entrée vide. C'est ce qui a masqué
+          # deux mois de backups vides.
+          set -euo pipefail
+
           ts=$(date -u +%Y%m%d-%H%M)
           file="backup-domitemps-${ts}.sql.gz"
+
           pg_dump --no-owner --no-acl --clean --if-exists "$DATABASE_URL" | gzip -9 > "$file"
-          size=$(du -h "$file" | cut -f1)
+
+          bytes=$(stat -c%s "$file")
           rows=$(zcat "$file" | wc -l)
+          # grep -c (et non -q) : -q sort dès la 1re occurrence, ce qui casse le tuyau et
+          # ferait échouer l'étape à cause de pipefail. « || true » couvre le cas 0 match.
+          tables=$(zcat "$file" | grep -cE '^CREATE TABLE' || true)
+
+          # Garde-fou : un dump vide ou sans structure ne doit JAMAIS passer pour un succès.
+          # L'étape échoue ici, donc aucun artefact trompeur n'est publié.
+          if [ "$bytes" -lt 10000 ] || [ "$tables" -lt 3 ]; then
+            echo "::error::Backup invalide : ${bytes} octets, ${tables} tables trouvées. Rien n'est publié."
+            exit 1
+          fi
+
+          size=$(du -h "$file" | cut -f1)
           echo "FILE_NAME=$file" >> "$GITHUB_ENV"
           echo "## Backup terminé" >> "$GITHUB_STEP_SUMMARY"
           echo "- Fichier : \`$file\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Taille : $size" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Taille : $size ($bytes octets)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tables : $tables" >> "$GITHUB_STEP_SUMMARY"
           echo "- Lignes SQL : $rows" >> "$GITHUB_STEP_SUMMARY"
           echo "- Date UTC : $(date -u)" >> "$GITHUB_STEP_SUMMARY"
 
