@@ -239,3 +239,41 @@ WHERE schemaname = 'public' AND tablename = 'users' AND policyname = 'users_upda
 -- ROLLBACK de cette étape 6 uniquement :
 -- DROP POLICY IF EXISTS users_update ON public.users;
 -- CREATE POLICY users_update ON public.users FOR UPDATE USING (auth_id = auth.uid());
+
+
+-- =====================================================================
+-- ÉTAPE 7 — CORRECTIF : l'étape 2 empêchait l'admin de créer un utilisateur
+--
+-- La page d'administration crée un compte en deux temps : auth.signUp() puis un
+-- INSERT dans public.users portant l'auth_id du NOUVEAU compte. La policy de
+-- l'étape 2 exigeait auth_id = auth.uid(), c'est-à-dire l'uid de l'administrateur
+-- connecté — l'insertion était donc refusée.
+--
+-- Régression introduite le 2026-08-31 par le durcissement lui-même : le plan de
+-- test ne couvrait pas la création d'utilisateur depuis l'admin.
+--
+-- On rouvre ce cas au seul administrateur. L'escalade reste fermée : un
+-- utilisateur ordinaire demeure limité à role='user' et à son propre auth_id, et
+-- le trigger de l'étape 3 continue d'interdire toute modification ultérieure du
+-- rôle par un non-admin.
+-- =====================================================================
+
+DROP POLICY IF EXISTS users_insert ON public.users;
+
+CREATE POLICY users_insert ON public.users
+  FOR INSERT
+  WITH CHECK (
+    public.is_admin()                        -- l'admin crée des comptes pour autrui
+    OR (
+      role = 'user'
+      AND (
+        (SELECT auth.uid()) IS NULL          -- inscription : pas encore de session
+        OR auth_id = (SELECT auth.uid())     -- connecté : uniquement pour soi
+      )
+    )
+  );
+
+-- Vérification
+SELECT policyname, cmd, with_check
+FROM pg_policies
+WHERE schemaname = 'public' AND tablename = 'users' AND policyname = 'users_insert';
