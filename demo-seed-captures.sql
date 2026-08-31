@@ -29,6 +29,19 @@
 --   Password : (au choix, à noter — il servira aussi à Google pour la review)
 --   ☑ Auto Confirm User   ← INDISPENSABLE, sinon la connexion sera refusée
 --
+--   Si la bascule « Auto Confirm User » est absente de votre version du
+--   dashboard (elle vit dans le formulaire « Create new user », pas dans
+--   « Send invitation »), créez le compte puis confirmez-le en SQL :
+--
+--     UPDATE auth.users SET email_confirmed_at = now()
+--     WHERE email = '<email du compte demo>' AND email_confirmed_at IS NULL;
+--
+--   Ne toucher QUE email_confirmed_at : sur les versions récentes,
+--   auth.users.confirmed_at est une colonne générée et refuse toute écriture.
+--
+--   Récupérer l'UID à coller plus bas :
+--     SELECT id, email, email_confirmed_at FROM auth.users WHERE email = '<...>';
+--
 -- Puis copier l'UID affiché et le coller ci-dessous.
 -- ---------------------------------------------------------------------
 
