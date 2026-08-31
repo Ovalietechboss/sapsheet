@@ -34,6 +34,8 @@
 - Cloture / reouverture / archivage
 - Historique des mois passes
 - **Vue Documents** : generation PDF par client
+- **Envoi du releve CESU au mandataire** par email, pour validation avant paiement :
+  bouton par client ou envoi en masse (un email par client), statut « Envoye » horodate
 - **Vue Chronologie** : liste des pointages du mois
 - **Export CSV** avec IK et BOM UTF-8 pour Excel
 - **Recapitulatif NOVA** trimestriel (heures, clients, CA hors frais)
@@ -81,7 +83,7 @@
 | Mobile | Capacitor 8 (Android SDK 36, appId: com.domitemps.app) |
 | PDF | html2canvas + jsPDF (JPEG 85%, scale 1.5) |
 | Deploy web | Vercel (auto-deploy depuis GitHub) |
-| Tests | Jest 29 (90 tests / 6 suites) |
+| Tests | Jest 29 (109 tests / 10 suites) |
 
 ## Structure du projet
 
@@ -170,7 +172,7 @@ npx cap open android   # Ouvrir dans Android Studio
 ### Tests
 
 ```bash
-npx jest               # 90 tests / 6 suites
+npx jest               # 109 tests / 10 suites
 ```
 
 ## Deploiement
@@ -198,7 +200,7 @@ npx jest               # 90 tests / 6 suites
 
 ## Roadmap
 
-- [ ] Envoi email automatique (Resend + Supabase Edge Functions)
+- [x] Envoi email automatique (Resend + Supabase Edge Functions) — factures, avoirs et releves CESU
 - [ ] Nom de domaine domitemps.fr
 - [ ] Publication Play Store
 - [ ] App iOS (Capacitor ready)
