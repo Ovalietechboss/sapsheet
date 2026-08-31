@@ -24,7 +24,17 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
           sudo apt-get update
           sudo apt-get install -y postgresql-client-17
-          pg_dump --version
+
+          # /usr/bin/pg_dump est un wrapper (pg_wrapper) qui continue de pointer vers la
+          # version 16 preinstallée sur le runner, même une fois le client 17 installé.
+          # On résout donc le binaire versionné le plus récent et on l'appelle directement.
+          PG_DUMP=$(ls -d /usr/lib/postgresql/*/bin/pg_dump 2>/dev/null | sort -V | tail -1)
+          if [ -z "$PG_DUMP" ] || [ ! -x "$PG_DUMP" ]; then
+            echo "::error::pg_dump introuvable après installation."
+            exit 1
+          fi
+          "$PG_DUMP" --version
+          echo "PG_DUMP=$PG_DUMP" >> "$GITHUB_ENV"
 
       - name: Dump database
         env:
@@ -38,7 +48,7 @@ jobs:
           ts=$(date -u +%Y%m%d-%H%M)
           file="backup-domitemps-${ts}.sql.gz"
 
-          pg_dump --no-owner --no-acl --clean --if-exists "$DATABASE_URL" | gzip -9 > "$file"
+          "$PG_DUMP" --no-owner --no-acl --clean --if-exists "$DATABASE_URL" | gzip -9 > "$file"
 
           bytes=$(stat -c%s "$file")
           rows=$(zcat "$file" | wc -l)
