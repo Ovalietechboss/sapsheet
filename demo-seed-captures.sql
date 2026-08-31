@@ -20,7 +20,12 @@
 -- ÉTAPE 1 — Créer le compte d'authentification (INTERFACE, pas SQL)
 --
 -- Supabase Dashboard → Authentication → Users → « Add user »
---   Email    : demo@domitemps.app
+--   Email    : UNE ADRESSE SUR UN DOMAINE QUE VOUS POSSEDEZ REELLEMENT.
+--              Supabase valide le domaine et refuse ce qui n'est pas délivrable :
+--              un domaine inventé est rejeté (« Email address is invalid »).
+--              Recommandé : demo@bigorre-aide.fr — domaine détenu, déjà routé
+--              par ImprovMX, et présentable dans les identifiants de test Google.
+--              À défaut : votre.adresse+demo@gmail.com (plus-addressing).
 --   Password : (au choix, à noter — il servira aussi à Google pour la review)
 --   ☑ Auto Confirm User   ← INDISPENSABLE, sinon la connexion sera refusée
 --
@@ -41,7 +46,7 @@ INSERT INTO public.users (
   address, phone, cesu_number, siren, business_name,
   created_at, updated_at
 ) VALUES (
-  'user_demo', 'COLLER-ICI-L-UID', 'demo@domitemps.app',   -- 👈 UID du compte auth
+  'user_demo', 'COLLER-ICI-L-UID', 'COLLER-ICI-L-EMAIL',   -- 👈 UID + email, identiques au compte auth
   'Camille', 'DURAND', 'assistant', 'user',
   '12 rue des Lilas, 65000 Tarbes', '06 00 00 00 00',
   'CESU-DEMO-0000', '000000000', 'Services à domicile Camille Durand',
