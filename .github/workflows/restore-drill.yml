@@ -1,0 +1,149 @@
+name: Restore drill (hebdomadaire)
+
+# Restaure POUR DE VRAI le dernier backup dans un Postgres jetable, puis vérifie
+# que les données métier sont bien là.
+#
+# Pourquoi : un backup « vert » et volumineux peut être tronqué ou incohérent.
+# Le contrôle de taille du workflow de backup prouve qu'un fichier existe ; SEULE
+# une restauration prouve qu'il est exploitable. Le 31/08/2026 on a découvert
+# 2 mois d'archives vides derrière des runs verts — un drill l'aurait vu au
+# premier passage.
+#
+# Ne touche JAMAIS la base de production : tout se passe dans un conteneur
+# éphémère détruit à la fin du job.
+
+on:
+  schedule:
+    - cron: "37 4 * * 1" # tous les lundis à 04:37 UTC, après le backup de 03:17
+  workflow_dispatch: {}
+
+permissions:
+  actions: read # nécessaire pour télécharger l'artefact du workflow de backup
+  contents: read
+
+jobs:
+  drill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: drill
+          POSTGRES_DB: drill
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - name: Install postgresql-client 17
+        run: |
+          set -euo pipefail
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
+          echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client-17
+          PSQL=$(ls -d /usr/lib/postgresql/*/bin/psql | sort -V | tail -1)
+          echo "PSQL=$PSQL" >> "$GITHUB_ENV"
+
+      - name: Récupérer le dernier backup réussi
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow backup-db.yml \
+            --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
+            echo "::error::Aucun run de backup réussi trouvé."
+            exit 1
+          fi
+          echo "Run de backup retenu : $run_id"
+          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --dir dump
+
+          gz=$(find dump -name '*.sql.gz' -type f | head -1)
+          if [ -z "$gz" ]; then
+            echo "::error::Aucune archive .sql.gz dans l'artefact."
+            exit 1
+          fi
+          bytes=$(stat -c%s "$gz")
+          echo "Archive : $gz ($bytes octets)"
+          if [ "$bytes" -lt 10000 ]; then
+            echo "::error::Archive de $bytes octets — backup vide, restauration impossible."
+            exit 1
+          fi
+          gunzip -c "$gz" > dump.sql
+          wc -l dump.sql
+
+      - name: Restaurer dans le Postgres jetable
+        env:
+          PGPASSWORD: drill
+        run: |
+          set -euo pipefail
+
+          # Le dump vient de Supabase : il référence des rôles (anon, authenticated…)
+          # et des extensions qui n'existent pas dans un Postgres nu. On crée les rôles
+          # pour limiter le bruit, et on tolère les erreurs sur ces objets d'infrastructure.
+          # Ce qui compte est vérifié explicitement à l'étape suivante : le schéma public.
+          for role in anon authenticated service_role supabase_admin supabase_auth_admin supabase_storage_admin authenticator dashboard_user pgbouncer; do
+            "$PSQL" -h localhost -U postgres -d drill -c "DO \$\$ BEGIN CREATE ROLE $role NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END \$\$;" -q
+          done
+
+          "$PSQL" -h localhost -U postgres -d drill -v ON_ERROR_STOP=0 -f dump.sql > restore.log 2>&1 || true
+          echo "Erreurs rencontrées (attendues sur les objets Supabase) : $(grep -c '^psql:.*ERROR' restore.log || true)"
+          grep '^psql:.*ERROR' restore.log | sed 's/.*ERROR/ERROR/' | sort | uniq -c | sort -rn | head -15 || true
+
+      - name: Vérifier que les données métier sont restaurées
+        env:
+          PGPASSWORD: drill
+        run: |
+          set -euo pipefail
+          q() { "$PSQL" -h localhost -U postgres -d drill -tAc "$1"; }
+
+          fail=0
+          summary=""
+
+          # Les 8 tables métier doivent exister ET porter des lignes pour les
+          # principales. Un dump structurellement valide mais vide de données
+          # serait tout aussi inutile qu'une archive de 20 octets.
+          for t in users clients timesheets mandataires client_contacts billing_periods billing_period_clients invoices; do
+            exists=$(q "SELECT to_regclass('public.$t') IS NOT NULL")
+            if [ "$exists" != "t" ]; then
+              echo "::error::Table public.$t ABSENTE après restauration."
+              fail=1
+              summary="${summary}| $t | ❌ absente |"$'\n'
+              continue
+            fi
+            n=$(q "SELECT count(*) FROM public.$t")
+            summary="${summary}| $t | $n lignes |"$'\n'
+            echo "public.$t : $n lignes"
+          done
+
+          # Tables dont le vide signalerait un dump inexploitable.
+          for t in users clients timesheets; do
+            n=$(q "SELECT count(*) FROM public.$t")
+            if [ "$n" -lt 1 ]; then
+              echo "::error::public.$t est VIDE après restauration — le backup n'est pas exploitable."
+              fail=1
+            fi
+          done
+
+          {
+            echo "## Drill de restauration"
+            echo ""
+            echo "| Table | Contenu restauré |"
+            echo "|---|---|"
+            echo "$summary"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::Le dernier backup n'est PAS restaurable en l'état."
+            exit 1
+          fi
+          echo "✔ Restauration vérifiée : les données métier sont bien présentes."
