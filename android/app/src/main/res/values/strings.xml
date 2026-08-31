@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">SAP Sheet</string>
-    <string name="title_activity_main">SAP Sheet</string>
-    <string name="package_name">com.sapsheet.app</string>
-    <string name="custom_url_scheme">com.sapsheet.app</string>
+    <string name="app_name">DomiTemps</string>
+    <string name="title_activity_main">DomiTemps</string>
+    <string name="package_name">com.domitemps.app</string>
+    <string name="custom_url_scheme">com.domitemps.app</string>
 </resources>
