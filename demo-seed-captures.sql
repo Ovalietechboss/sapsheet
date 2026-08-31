@@ -27,8 +27,9 @@
 -- Puis copier l'UID affiché et le coller ci-dessous.
 -- ---------------------------------------------------------------------
 
--- 👉 REMPLACER par l'UID du compte créé à l'étape 1 :
-\set demo_auth_id 'COLLER-ICI-L-UID'
+-- 👉 Rien à faire ici : l'UID se colle directement dans l'INSERT de l'étape 2,
+--    à la place de COLLER-ICI-L-UID (l'éditeur SQL de Supabase ne gère pas la
+--    syntaxe \set de psql).
 
 
 -- ---------------------------------------------------------------------
@@ -40,7 +41,7 @@ INSERT INTO public.users (
   address, phone, cesu_number, siren, business_name,
   created_at, updated_at
 ) VALUES (
-  'user_demo', :'demo_auth_id', 'demo@domitemps.app',
+  'user_demo', 'COLLER-ICI-L-UID', 'demo@domitemps.app',   -- 👈 UID du compte auth
   'Camille', 'DURAND', 'assistant', 'user',
   '12 rue des Lilas, 65000 Tarbes', '06 00 00 00 00',
   'CESU-DEMO-0000', '000000000', 'Services à domicile Camille Durand',
@@ -127,7 +128,7 @@ JOIN cl ON cl.n = ((j.d - 1) % 4) + 1;
 -- ÉTAPE 4 — Contrôle
 -- ---------------------------------------------------------------------
 
-SELECT 'clients'    AS table, count(*) FROM public.clients    WHERE user_id = 'user_demo'
+SELECT 'clients'    AS objet, count(*) FROM public.clients    WHERE user_id = 'user_demo'
 UNION ALL SELECT 'pointages', count(*) FROM public.timesheets WHERE user_id = 'user_demo'
 UNION ALL SELECT 'mandataires', count(*) FROM public.mandataires WHERE user_id = 'user_demo';
 -- Attendu : 4 clients, 16 pointages, 1 mandataire.
