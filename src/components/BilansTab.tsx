@@ -10,7 +10,8 @@ import { useBillingPeriodStore, BillingPeriod, ClientDocStatus } from '../stores
 import { useInvoiceStore, InvoiceLine } from '../stores/invoiceStore.supabase';
 import { generateCESUTemplate, generateClassicalTemplate, generateRecapTemplate } from '../services/InvoiceTemplates';
 import { nextInvoiceNumber } from '../services/invoiceNumbering';
-import { generateAndSharePDF } from '../utils/pdfGenerator';
+import { generateAndSharePDF, generatePdfBase64 } from '../utils/pdfGenerator';
+import { supabase } from '../lib/supabase';
 import { isDureeDirecte } from '../utils/timesheetMode';
 
 const MONTHS = [
@@ -72,6 +73,8 @@ export default function BilansTab() {
   const [showUrssaf, setShowUrssaf] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; mode: 'CESU' | 'CLASSICAL' } | null>(null);
   const [confirmBulk, setConfirmBulk] = useState<{ mode: 'CESU' | 'CLASSICAL'; alreadyGen: number; pending: number } | null>(null);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const [sendProgress, setSendProgress] = useState<{ done: number; total: number } | null>(null);
   const [detailClient, setDetailClient] = useState<ClientRow | null>(null);
   // Facture indépendante (société B2B, lignes libres)
   const [societeModal, setSocieteModal] = useState<ClientRow | null>(null);
@@ -170,36 +173,47 @@ export default function BilansTab() {
 
   // ── Génération PDF ─────────────────────────────────────────────────────────
 
+  // Construit le document (HTML) d'un client pour le mois sélectionné.
+  // Partagé entre la génération (téléchargement/partage) et l'envoi par email.
+  const buildDoc = (row: ClientRow) => {
+    if (!userProfile) return null;
+    const client = clients.find((c) => c.id === row.clientId);
+    if (!client) return null;
+    const cts = monthTimesheets.filter((ts) => ts.client_id === client.id);
+
+    const isCESU = client.facturation_mode === 'CESU';
+    const clientTag = client.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_àâäéèêëïîôùûüçÀÂÄÉÈÊËÏÎÔÙÛÜÇ]/g, '');
+    const invoiceNumber = isCESU
+      ? `CESU-${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${clientTag}`
+      : `FAC-${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${clientTag}`;
+
+    const invoiceData: any = {
+      invoice_number: invoiceNumber,
+      created_at: Date.now(),
+      total_amount: row.totalAmount,
+      month: selectedMonth,
+      year: selectedYear,
+    };
+
+    const clientContacts = getContactsForClient(client.id);
+
+    const html = isCESU
+      ? generateCESUTemplate(invoiceData, client, cts, userProfile, row.mandataire, clientContacts)
+      : generateClassicalTemplate(invoiceData, client, cts, userProfile, row.mandataire, clientContacts);
+
+    return { client, cts, isCESU, invoiceNumber, html, clientContacts };
+  };
+
   const handleGenerate = async (row: ClientRow) => {
     if (!user || !userProfile || isLocked) return;
     setGenerating(row.clientId);
     try {
       const period = await getOrCreatePeriod(selectedMonth, selectedYear);
-      const client = clients.find((c) => c.id === row.clientId)!;
-      const cts = monthTimesheets.filter((ts) => ts.client_id === client.id);
+      const doc = buildDoc(row);
+      if (!doc) return;
+      const { client, isCESU, invoiceNumber, html } = doc;
 
-      const isCESU = client.facturation_mode === 'CESU';
-      const clientTag = client.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_àâäéèêëïîôùûüçÀÂÄÉÈÊËÏÎÔÙÛÜÇ]/g, '');
-      const invoiceNumber = isCESU
-        ? `CESU-${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${clientTag}`
-        : `FAC-${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${clientTag}`;
-
-      const invoiceData: any = {
-        invoice_number: invoiceNumber,
-        created_at: Date.now(),
-        total_amount: row.totalAmount,
-        month: selectedMonth,
-        year: selectedYear,
-      };
-
-      const clientContacts = getContactsForClient(client.id);
-
-      const html = isCESU
-        ? generateCESUTemplate(invoiceData, client, cts, userProfile, row.mandataire, clientContacts)
-        : generateClassicalTemplate(invoiceData, client, cts, userProfile, row.mandataire, clientContacts);
-
-      const filename = `${invoiceNumber}`;
-      await generateAndSharePDF(html, filename);
+      await generateAndSharePDF(html, `${invoiceNumber}`);
 
       // Lien Bilans → module Factures : suivi de la facture (clients classiques uniquement ;
       // CESU = pointage, pas une facture). Idempotent + SOFT-FAIL : si l'écriture échoue
@@ -237,6 +251,108 @@ export default function BilansTab() {
     } finally {
       setGenerating(null);
     }
+  };
+
+  // ── Envoi du relevé CESU au mandataire (BIL-01) ─────────────────────
+  //
+  // Réutilise l'Edge Function `send-invoice` (Resend), déjà en place pour les factures :
+  // elle est générique (to/cc/subject/message/pdfBase64/filename), aucune modif côté serveur.
+  //
+  // CESU uniquement, volontairement : une facture CLASSIQUE s'envoie depuis l'onglet
+  // Factures, seul endroit qui tient à jour `invoices.sent_at` / `status`. L'envoyer aussi
+  // d'ici créerait deux suivis divergents pour un même document.
+  const sendCesuEmail = async (row: ClientRow, opts?: { silent?: boolean }): Promise<boolean> => {
+    if (!user || !userProfile || isLocked) return false;
+    const doc = buildDoc(row);
+    if (!doc || !doc.isCESU) return false;
+
+    // Même règle de destinataire que les factures : mandataire d'abord (le CESU est géré
+    // par l'association), sinon le client, sinon le 1er destinataire supplémentaire.
+    const to = row.recipientEmail || doc.clientContacts[0]?.email;
+    if (!to) {
+      if (!opts?.silent) alert(`Aucun email destinataire pour ${row.clientName} (renseignez le mandataire, l'email du client ou un destinataire supplémentaire).`);
+      return false;
+    }
+    const cc = doc.clientContacts.map((c) => c.email).filter((e) => e && e !== to);
+    const periodLabel = `${MONTHS[selectedMonth - 1]} ${selectedYear}`;
+
+    if (!opts?.silent) {
+      const warn = row.hasDraftTimesheets
+        ? `\n\n⚠️ Ce client a des pointages NON VALIDÉS sur ${periodLabel}.`
+        : '';
+      if (!window.confirm(`Envoyer le relevé CESU de ${row.clientName} (${periodLabel}) à ${to} ?${warn}`)) return false;
+    }
+
+    setSendingId(row.clientId);
+    try {
+      const period = await getOrCreatePeriod(selectedMonth, selectedYear);
+      const pdfBase64 = await generatePdfBase64(doc.html);
+      // Signature = prénom + nom (display_name ne contient que le nom de famille).
+      const signature = [user.first_name, user.display_name].filter(Boolean).join(' ') || user.business_name || '';
+      const subject = `Relevé de pointages CESU — ${row.clientName} — ${periodLabel}`;
+      const message =
+        `Bonjour,\n\nVeuillez trouver en pièce jointe le relevé de pointages de ${row.clientName} ` +
+        `pour ${periodLabel}, pour validation avant paiement.\n\n` +
+        `${row.totalHours.toFixed(1)} h · ${row.totalAmount.toFixed(2)} €\n\n` +
+        `Je reste à votre disposition pour tout complément.\n\nCordialement,\n${signature}`;
+
+      const { data, error } = await supabase.functions.invoke('send-invoice', {
+        body: { to, cc, subject, message, pdfBase64, filename: `${doc.invoiceNumber}.pdf` },
+      });
+      if (error || (data && data.error)) {
+        throw new Error(error?.message || data?.error || "Échec de l'envoi");
+      }
+
+      await upsertClientStatus(period.id, row.clientId, {
+        status: 'sent', sent_at: Date.now(), recipient_email: to,
+      });
+      if (!opts?.silent) alert(`Email envoyé à ${to}.`);
+      return true;
+    } catch (e: any) {
+      console.error('Envoi CESU échoué:', e);
+      if (!opts?.silent) {
+        alert(`Échec de l'envoi : ${e?.message || e}\n\n(La fonction send-invoice est-elle déployée et la clé Resend configurée ?)`);
+      }
+      return false;
+    } finally {
+      setSendingId(null);
+    }
+  };
+
+  // Envoi en masse : un email par client (le mandataire reçoit un dossier par bénéficiaire).
+  // Séquentiel — chaque PDF passe par html2canvas, les paralléliser saturerait le navigateur.
+  const handleSendBulkCesu = async () => {
+    const targets = groups
+      .flatMap((g) => g.clients)
+      .filter((r) => r.facturationMode === 'CESU' && r.timesheetCount > 0 && !!r.recipientEmail);
+    if (targets.length === 0) {
+      alert('Aucun client CESU avec un email destinataire ce mois.');
+      return;
+    }
+    const drafts = targets.filter((r) => r.hasDraftTimesheets).length;
+    const already = targets.filter((r) => r.docStatus === 'sent').length;
+    const details = [
+      drafts > 0 ? `⚠️ ${drafts} client${drafts > 1 ? 's ont' : ' a'} des pointages NON VALIDÉS.` : '',
+      already > 0 ? `${already} déjà envoyé${already > 1 ? 's' : ''} — ils seront renvoyés.` : '',
+    ].filter(Boolean).join('\n');
+    if (!window.confirm(
+      `Envoyer ${targets.length} relevé${targets.length > 1 ? 's' : ''} CESU (${MONTHS[selectedMonth - 1]} ${selectedYear}), un email par client ?` +
+      (details ? `\n\n${details}` : '')
+    )) return;
+
+    setSendProgress({ done: 0, total: targets.length });
+    let ok = 0;
+    const failed: string[] = [];
+    for (let i = 0; i < targets.length; i++) {
+      const sent = await sendCesuEmail(targets[i], { silent: true });
+      if (sent) ok++; else failed.push(targets[i].clientName);
+      setSendProgress({ done: i + 1, total: targets.length });
+    }
+    setSendProgress(null);
+    alert(
+      `${ok}/${targets.length} relevé${targets.length > 1 ? 's' : ''} envoyé${ok > 1 ? 's' : ''}.` +
+      (failed.length ? `\n\nÉchecs : ${failed.join(', ')}` : '')
+    );
   };
 
   // ── Facture indépendante (société B2B, lignes libres) ───────────────────────
@@ -693,6 +809,15 @@ export default function BilansTab() {
                             {generating === row.clientId ? '...' : isCESU ? (row.docStatus === 'pending' ? 'Pointage CESU' : 'Regénérer') : (row.docStatus === 'pending' ? 'Facture' : 'Regénérer')}
                           </button>
                         )}
+                        {isCESU && row.timesheetCount > 0 && !isLocked && (
+                          <button
+                            disabled={sendingId === row.clientId || !!sendProgress || !row.recipientEmail}
+                            onClick={() => sendCesuEmail(row)}
+                            title={row.recipientEmail ? `Envoyer à ${row.recipientEmail}` : 'Aucun email destinataire (mandataire ou client)'}
+                            style={{ padding: '7px 14px', backgroundColor: (sendingId === row.clientId || !!sendProgress || !row.recipientEmail) ? '#ccc' : '#5856D6', color: 'white', border: 'none', borderRadius: '6px', cursor: (sendingId === row.clientId || !!sendProgress || !row.recipientEmail) ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                            {sendingId === row.clientId ? 'Envoi…' : row.docStatus === 'sent' ? '✉️ Renvoyer' : '✉️ Envoyer'}
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -705,6 +830,7 @@ export default function BilansTab() {
           {!isLocked && totalClientsActive > 0 && (() => {
             const all = groups.flatMap((g) => g.clients).filter((r) => r.timesheetCount > 0);
             const cesuCount = all.filter((r) => r.facturationMode === 'CESU').length;
+            const cesuSendable = all.filter((r) => r.facturationMode === 'CESU' && !!r.recipientEmail).length;
             const classicCount = all.filter((r) => r.facturationMode === 'CLASSICAL').length;
             return (
               <div style={{ marginTop: '20px', display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -712,6 +838,13 @@ export default function BilansTab() {
                   <button onClick={() => startBulk('CESU')} disabled={!!bulkProgress}
                     style={{ padding: '12px 24px', backgroundColor: bulkProgress ? '#ccc' : '#34C759', color: 'white', border: 'none', borderRadius: '8px', cursor: bulkProgress ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: 'bold' }}>
                     Générer tous les CESU ({cesuCount})
+                  </button>
+                )}
+                {cesuSendable > 0 && (
+                  <button onClick={handleSendBulkCesu} disabled={!!bulkProgress || !!sendProgress}
+                    title="Un email par client, au mandataire quand il y en a un"
+                    style={{ padding: '12px 24px', backgroundColor: (bulkProgress || sendProgress) ? '#ccc' : '#5856D6', color: 'white', border: 'none', borderRadius: '8px', cursor: (bulkProgress || sendProgress) ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: 'bold' }}>
+                    ✉️ Envoyer tous les CESU ({cesuSendable})
                   </button>
                 )}
                 {classicCount > 0 && (
@@ -728,6 +861,13 @@ export default function BilansTab() {
           {bulkProgress && (
             <div style={{ marginTop: '12px', textAlign: 'center', color: '#666', fontSize: '13px' }}>
               Génération {bulkProgress.mode === 'CESU' ? 'CESU' : 'factures'} en cours… <strong>{bulkProgress.done}/{bulkProgress.total}</strong>
+            </div>
+          )}
+
+          {/* Progression envoi CESU */}
+          {sendProgress && (
+            <div style={{ marginTop: '12px', textAlign: 'center', color: '#666', fontSize: '13px' }}>
+              Envoi des relevés CESU en cours… <strong>{sendProgress.done}/{sendProgress.total}</strong>
             </div>
           )}
 
