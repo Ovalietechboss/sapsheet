@@ -199,3 +199,43 @@ SELECT id, email, role FROM public.users WHERE role = 'admin';
 -- DROP POLICY IF EXISTS avatars_delete ON storage.objects;
 -- CREATE POLICY avatars_all_auth ON storage.objects TO authenticated
 --   USING (true) WITH CHECK (true);
+
+
+-- =====================================================================
+-- ÉTAPE 6 — ADDENDUM du 2026-08-31, après application des étapes 1 à 5
+--
+-- Symptôme constaté : impossible de basculer un compte en admin depuis la page
+-- d'administration. Le bouton ne renvoie aucune erreur, la page se recharge à
+-- l'identique.
+--
+-- Cause : la policy users_update est USING (auth_id = auth.uid()), SANS clause
+-- is_admin(). Un administrateur ne peut donc modifier QUE sa propre ligne. RLS
+-- filtre silencieusement la ligne visée, l'UPDATE touche 0 enregistrement, et
+-- AdminPage.tsx ignore le résultat renvoyé — d'où l'absence de message.
+--
+-- Ce défaut est ANTÉRIEUR au durcissement de ce jour (vérifié sur le dump de
+-- 18:51). Le bouton n'a jamais fonctionné ; le compte admin initial avait été
+-- promu directement en SQL, ce qui contourne RLS.
+--
+-- L'escalade de privilèges reste fermée : le trigger de l'étape 3 continue
+-- d'interdire toute modification de `role` ou `auth_id` à qui n'est pas admin.
+-- On rend simplement à l'administrateur le pouvoir que la page lui prête déjà.
+-- =====================================================================
+
+DROP POLICY IF EXISTS users_update ON public.users;
+
+CREATE POLICY users_update ON public.users
+  FOR UPDATE
+  USING      (auth_id = (SELECT auth.uid()) OR public.is_admin())
+  WITH CHECK (auth_id = (SELECT auth.uid()) OR public.is_admin());
+
+-- Vérification : basculer Cathy en admin depuis la page d'administration doit
+-- désormais fonctionner, et un utilisateur non-admin doit toujours se heurter à
+-- « Modification du role interdite » s'il tente de se promouvoir.
+SELECT policyname, cmd, qual, with_check
+FROM pg_policies
+WHERE schemaname = 'public' AND tablename = 'users' AND policyname = 'users_update';
+
+-- ROLLBACK de cette étape 6 uniquement :
+-- DROP POLICY IF EXISTS users_update ON public.users;
+-- CREATE POLICY users_update ON public.users FOR UPDATE USING (auth_id = auth.uid());

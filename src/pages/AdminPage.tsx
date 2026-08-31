@@ -163,7 +163,22 @@ export default function AdminPage() {
 
   const handleToggleRole = async (u: DbUser) => {
     const newRole = u.role === 'admin' ? 'user' : 'admin';
-    await supabase.from('users').update({ role: newRole }).eq('id', u.id);
+    // `.select()` renvoie les lignes réellement modifiées. Sans lui, une policy RLS
+    // qui filtre la ligne donne un succès portant sur 0 enregistrement : le bouton
+    // semblait fonctionner alors qu'il ne faisait rien (constaté le 31/08/2026).
+    const { data, error } = await supabase
+      .from('users')
+      .update({ role: newRole })
+      .eq('id', u.id)
+      .select('id');
+    if (error) {
+      alert(`Changement de rôle refusé : ${error.message}`);
+      return;
+    }
+    if (!data || data.length === 0) {
+      alert("Aucune ligne modifiée — vos droits ne permettent pas de changer le rôle de ce compte.");
+      return;
+    }
     await loadData();
   };
 
@@ -175,7 +190,21 @@ export default function AdminPage() {
     if (!window.confirm(msg)) return;
 
     // Supprimer dans la table users (CASCADE supprime clients, timesheets, etc.)
-    await supabase.from('users').delete().eq('id', u.id);
+    // Même précaution que pour le rôle : sans `.select()`, une suppression bloquée
+    // par RLS passerait pour un succès.
+    const { data, error } = await supabase
+      .from('users')
+      .delete()
+      .eq('id', u.id)
+      .select('id');
+    if (error) {
+      alert(`Suppression refusée : ${error.message}`);
+      return;
+    }
+    if (!data || data.length === 0) {
+      alert("Aucun compte supprimé — vos droits ne permettent pas cette suppression.");
+      return;
+    }
     await loadData();
   };
 
