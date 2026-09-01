@@ -14,5 +14,9 @@ body {
 
 #root {
   width: 100%;
+  /* 100vh se cale sur la hauteur AVEC la barre d'adresse : sur iOS le bas de
+     l'application se retrouve hors ecran. 100dvh suit la hauteur reellement
+     visible. L'ancienne valeur reste en repli pour les navigateurs anciens. */
   height: 100vh;
+  height: 100dvh;
 }

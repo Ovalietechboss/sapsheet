@@ -82,8 +82,11 @@ export default function HomePage() {
           onClick={handleMenuToggle}
           style={{
             position: 'fixed',
-            top: '10px',
-            left: '10px',
+            // viewport-fit=cover + status-bar-style black-translucent font dessiner
+            // l'app SOUS la barre d'etat : sans ce decalage, le bouton passe sous
+            // l'encoche ou la Dynamic Island. env() vaut 0 la ou il n'y en a pas.
+            top: 'calc(10px + env(safe-area-inset-top))',
+            left: 'calc(10px + env(safe-area-inset-left))',
             zIndex: 10000,
             // Sans box-sizing, le padding de 16px s'AJOUTE au minHeight : le bouton
             // mesurait 81px au lieu de 56 et recouvrait le titre de chaque page
@@ -135,6 +138,8 @@ export default function HomePage() {
           backgroundColor: '#f5f5f5',
           borderRight: '1px solid #ddd',
           padding: '20px',
+          paddingTop: 'calc(20px + env(safe-area-inset-top))',
+          paddingBottom: 'calc(20px + env(safe-area-inset-bottom))',
           display: 'flex',
           flexDirection: 'column',
           position: isMobile ? 'fixed' : 'relative',
@@ -192,6 +197,10 @@ export default function HomePage() {
         style={{
           flex: 1,
           padding: isMobile ? '70px 20px 20px 20px' : '40px',
+          paddingTop: isMobile
+            ? 'calc(70px + env(safe-area-inset-top))'
+            : 'calc(40px + env(safe-area-inset-top))',
+          paddingBottom: 'calc(20px + env(safe-area-inset-bottom))',
           overflowY: 'auto',
         }}
       >
