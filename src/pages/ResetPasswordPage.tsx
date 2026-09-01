@@ -95,8 +95,7 @@ export default function ResetPasswordPage() {
                 Installer DomiTemps sur votre téléphone
               </h3>
               <p style={{ color: '#666', fontSize: '13px', margin: '0 0 14px' }}>
-                L'application s'ajoute à votre écran d'accueil et s'ouvre comme une application
-                classique. Rien à télécharger, et les mises à jour se font toutes seules.
+                La marche à suivre dépend de votre téléphone.
               </p>
 
               <div style={{ background: '#f7f8fa', borderRadius: '10px', padding: '12px 14px', marginBottom: '10px' }}>
@@ -104,17 +103,26 @@ export default function ResetPasswordPage() {
                 <p style={{ margin: 0, color: '#555', fontSize: '13px', lineHeight: 1.5 }}>
                   Ouvrez cette page dans <strong>Safari</strong>, touchez le bouton Partager
                   (le carré avec une flèche), puis <strong>« Sur l'écran d'accueil »</strong>.
+                  Rien à télécharger, et les mises à jour se font toutes seules.
                 </p>
               </div>
 
+              {/* Sur Android, l'application est distribuee par le Play Store. On n'y propose
+                  PAS l'installation en raccourci : la personne se retrouverait avec deux
+                  icones DomiTemps, dont une figee a la version installee ce jour-la. */}
               <div style={{ background: '#f7f8fa', borderRadius: '10px', padding: '12px 14px' }}>
                 <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: '13px' }}>Sur Android</p>
                 <p style={{ margin: 0, color: '#555', fontSize: '13px', lineHeight: 1.5 }}>
-                  Ouvrez cette page dans <strong>Chrome</strong>, touchez le menu ⋮ en haut à
-                  droite, puis <strong>« Installer l'application »</strong> ou
-                  <strong> « Ajouter à l'écran d'accueil »</strong>.
+                  L'application s'installe depuis le <strong>Play Store</strong>. Vous recevrez
+                  séparément un lien d'invitation, à ouvrir depuis votre téléphone : sans lui,
+                  l'application n'apparaîtra pas dans le Store.
                 </p>
               </div>
+
+              <p style={{ color: '#888', fontSize: '12px', margin: '12px 0 0', lineHeight: 1.5 }}>
+                En attendant, vous pouvez utiliser DomiTemps directement dans votre navigateur —
+                toutes les fonctions y sont disponibles.
+              </p>
             </div>
           </>
         ) : !validSession ? (
