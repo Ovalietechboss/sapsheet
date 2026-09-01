@@ -256,6 +256,13 @@ export default function AdminPage() {
       alert("Aucun compte supprimé — vos droits ne permettent pas cette suppression.");
       return;
     }
+    // Le compte d'AUTHENTIFICATION survit : le supprimer exige la clé service_role,
+    // qui ne peut pas vivre dans un navigateur. Sans ce rappel, il reste un compte
+    // orphelin dans auth.users — invisible ici, mais qui empêche de recréer la même
+    // adresse plus tard (violation de users_auth_id_fkey).
+    alert("Profil et données supprimés." + "\n\n"
+      + "⚠️ Le compte de connexion de " + u.email + " existe toujours." + "\n"
+      + "Pour le supprimer complètement : Supabase → Authentication → Users.");
     await loadData();
   };
 
