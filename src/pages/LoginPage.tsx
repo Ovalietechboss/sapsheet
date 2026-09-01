@@ -14,6 +14,7 @@ export default function LoginPage() {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -32,10 +33,18 @@ export default function LoginPage() {
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setForgotLoading(true);
-    await supabase.auth.resetPasswordForEmail(forgotEmail, {
+    setForgotError('');
+    // L'erreur etait purement ignoree : l'ecran annoncait « email envoye » meme quand
+    // Supabase refusait l'envoi — SMTP mal configure, debit limite, service indisponible.
+    // On ne pouvait rien apprendre d'un test. Un echec doit se voir.
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     setForgotLoading(false);
+    if (error) {
+      setForgotError(error.message);
+      return;
+    }
     setForgotSent(true);
   };
 
@@ -396,6 +405,13 @@ export default function LoginPage() {
                     {forgotLoading ? 'Envoi...' : 'Envoyer'}
                   </button>
                 </div>
+
+                {forgotError && (
+                  <div style={{ marginTop: '14px', background: '#FFF0F0', border: '1px solid #FFD0D0',
+                    borderRadius: '8px', padding: '10px 14px', color: '#CC0000', fontSize: '13px' }}>
+                    L'envoi a échoué : {forgotError}
+                  </div>
+                )}
               </form>
             </>
           )}
