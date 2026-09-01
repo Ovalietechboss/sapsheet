@@ -69,6 +69,35 @@ export default function ResetPasswordPage() {
             >
               Aller à la connexion
             </a>
+
+            {/* C'est ici qu'atterrit une personne invitee : le moment ou l'information sur
+                l'installation est la plus utile. Un email de plus se serait perdu. */}
+            <div style={{ marginTop: '26px', paddingTop: '22px', borderTop: '1px solid #eee' }}>
+              <h3 style={{ fontSize: '15px', margin: '0 0 6px', color: '#1a1a2e' }}>
+                Installer DomiTemps sur votre téléphone
+              </h3>
+              <p style={{ color: '#666', fontSize: '13px', margin: '0 0 14px' }}>
+                L'application s'ajoute à votre écran d'accueil et s'ouvre comme une application
+                classique. Rien à télécharger, et les mises à jour se font toutes seules.
+              </p>
+
+              <div style={{ background: '#f7f8fa', borderRadius: '10px', padding: '12px 14px', marginBottom: '10px' }}>
+                <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: '13px' }}>Sur iPhone</p>
+                <p style={{ margin: 0, color: '#555', fontSize: '13px', lineHeight: 1.5 }}>
+                  Ouvrez cette page dans <strong>Safari</strong>, touchez le bouton Partager
+                  (le carré avec une flèche), puis <strong>« Sur l'écran d'accueil »</strong>.
+                </p>
+              </div>
+
+              <div style={{ background: '#f7f8fa', borderRadius: '10px', padding: '12px 14px' }}>
+                <p style={{ margin: '0 0 4px', fontWeight: 700, fontSize: '13px' }}>Sur Android</p>
+                <p style={{ margin: 0, color: '#555', fontSize: '13px', lineHeight: 1.5 }}>
+                  Ouvrez cette page dans <strong>Chrome</strong>, touchez le menu ⋮ en haut à
+                  droite, puis <strong>« Installer l'application »</strong> ou
+                  <strong> « Ajouter à l'écran d'accueil »</strong>.
+                </p>
+              </div>
+            </div>
           </>
         ) : !validSession ? (
           <div style={{ textAlign: 'center', color: '#666' }}>

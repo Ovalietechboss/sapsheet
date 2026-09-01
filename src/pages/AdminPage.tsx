@@ -43,7 +43,7 @@ export default function AdminPage() {
   const [activeSection, setActiveSection] = useState<'dashboard' | 'users' | 'maintenance' | 'settings'>('dashboard');
   const [impersonating, setImpersonating] = useState<string | null>(null);
   const [showCreateUser, setShowCreateUser] = useState(false);
-  const [createForm, setCreateForm] = useState({ email: '', password: '', display_name: '', type: 'assistant' as 'assistant' | 'employer' });
+  const [createForm, setCreateForm] = useState({ email: '', password: '', display_name: '', type: 'assistant' as 'assistant' | 'employer', invite: true });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
 
@@ -128,10 +128,16 @@ export default function AdminPage() {
     setCreating(true);
     setCreateError('');
     try {
-      // 1. Créer le compte auth Supabase
+      // 1. Créer le compte auth Supabase.
+      //    En mode invitation, le mot de passe n'est jamais montré ni transmis : on en
+      //    génère un aléatoire, et la personne définira le sien via le lien reçu par email.
+      //    Un mot de passe communiqué par SMS ou par téléphone finit toujours par traîner.
+      const motDePasse = createForm.invite
+        ? crypto.randomUUID() + crypto.randomUUID()
+        : createForm.password;
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: createForm.email,
-        password: createForm.password,
+        password: motDePasse,
       });
       if (authError) throw new Error(authError.message);
       if (!authData.user) throw new Error('Création du compte auth échouée');
@@ -150,10 +156,27 @@ export default function AdminPage() {
       });
       if (insertError) throw new Error(insertError.message);
 
-      // 3. Rafraîchir la liste
+      // 3. Invitation : on réutilise le mécanisme de réinitialisation, déjà en place pour
+      //    « mot de passe oublié ». La personne reçoit un lien, choisit son mot de passe sur
+      //    /reset-password, et y trouve les instructions d'installation sur téléphone.
+      //    SOFT-FAIL : le compte existe, on ne l'annule pas si l'email échoue.
+      if (createForm.invite) {
+        const { error: inviteError } = await supabase.auth.resetPasswordForEmail(
+          createForm.email,
+          { redirectTo: window.location.origin + '/reset-password' },
+        );
+        if (inviteError) {
+          alert("Compte créé, mais l'invitation n'a pas pu être envoyée : " + inviteError.message
+            + " — utilisez « Mot de passe oublié » depuis l'écran de connexion pour la renvoyer.");
+        } else {
+          alert("Compte créé. Une invitation a été envoyée à " + createForm.email + ".");
+        }
+      }
+
+      // 4. Rafraîchir la liste
       await loadData();
       setShowCreateUser(false);
-      setCreateForm({ email: '', password: '', display_name: '', type: 'assistant' });
+      setCreateForm({ email: '', password: '', display_name: '', type: 'assistant', invite: true });
     } catch (err: any) {
       setCreateError(err.message || 'Erreur lors de la création');
     } finally {
@@ -534,12 +557,33 @@ export default function AdminPage() {
                 <input type="email" value={createForm.email} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} required placeholder="cathy@email.fr"
                   style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }} />
               </div>
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold', fontSize: '13px' }}>Mot de passe *</label>
-                <input type="text" value={createForm.password} onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })} required placeholder="minimum 6 caractères"
-                  style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }} />
-                <p style={{ color: '#888', fontSize: '11px', marginTop: '4px' }}>Visible ici pour que vous puissiez le communiquer à l'utilisateur</p>
+              {/* Invitation par email : la personne choisit elle-meme son mot de passe.
+                  Decoche, on retombe sur l'ancien fonctionnement — un mot de passe defini
+                  ici, a communiquer de vive voix. */}
+              <div style={{ marginBottom: '14px', background: '#F0F7FF', border: '1px solid #cfe4ff', borderRadius: '8px', padding: '12px 14px' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={createForm.invite}
+                    onChange={(e) => setCreateForm({ ...createForm, invite: e.target.checked })}
+                    style={{ marginTop: '3px', width: '17px', height: '17px', cursor: 'pointer' }} />
+                  <span>
+                    <span style={{ fontWeight: 'bold', fontSize: '13px' }}>Envoyer une invitation par email</span>
+                    <span style={{ display: 'block', color: '#555', fontSize: '12px', marginTop: '3px' }}>
+                      La personne reçoit un lien, définit son propre mot de passe, et obtient les
+                      instructions pour installer l'application sur son téléphone. Aucun mot de passe
+                      ne circule.
+                    </span>
+                  </span>
+                </label>
               </div>
+
+              {!createForm.invite && (
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold', fontSize: '13px' }}>Mot de passe *</label>
+                  <input type="text" value={createForm.password} onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })} required placeholder="minimum 6 caractères"
+                    style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '8px', fontSize: '14px', boxSizing: 'border-box' }} />
+                  <p style={{ color: '#888', fontSize: '11px', marginTop: '4px' }}>À communiquer vous-même à l'utilisateur — préférez l'invitation si possible</p>
+                </div>
+              )}
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold', fontSize: '13px' }}>Type de compte</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
