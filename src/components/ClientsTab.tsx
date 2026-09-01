@@ -73,25 +73,32 @@ export default function ClientsTab() {
       // Base commune. On n'AJOUTE les colonnes société (client_type/company_*) QUE pour une
       // société : un particulier ne référence pas ces colonnes → création OK même si la
       // migration « clients » n'est pas (encore) appliquée. Pas de régression sans migration.
-      const data: Record<string, any> = {
+      const commun = {
         name: clientForm.name,
         email: clientForm.email || undefined,
         address: clientForm.address,
         observations: clientForm.observations || undefined,
       };
-      if (isSociete) {
-        data.client_type = 'SOCIETE';
-        data.facturation_mode = 'CLASSICAL';
-        data.company_siret = clientForm.company_siret || undefined;
-        data.company_vat = clientForm.company_vat || undefined;
-        data.hourly_rate = 0; // facture indépendante : pas de taux horaire
-      } else {
-        data.titre = clientForm.titre || undefined;
-        data.first_name = clientForm.first_name || undefined;
-        data.facturation_mode = clientForm.facturation_mode;
-        data.hourly_rate = clientForm.hourly_rate;
-        data.mandataire_id = clientForm.mandataire_id || undefined;
-      }
+      // Typé au lieu de Record<string, any> : une faute de frappe sur un nom de colonne
+      // passait jusqu'ici sans être vue. L'intention d'origine est conservée — les
+      // colonnes société ne figurent QUE dans la branche société.
+      const data: Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at'> = isSociete
+        ? {
+            ...commun,
+            client_type: 'SOCIETE',
+            facturation_mode: 'CLASSICAL',
+            company_siret: clientForm.company_siret || undefined,
+            company_vat: clientForm.company_vat || undefined,
+            hourly_rate: 0, // facture indépendante : pas de taux horaire
+          }
+        : {
+            ...commun,
+            titre: clientForm.titre || undefined,
+            first_name: clientForm.first_name || undefined,
+            facturation_mode: clientForm.facturation_mode,
+            hourly_rate: clientForm.hourly_rate,
+            mandataire_id: clientForm.mandataire_id || undefined,
+          };
       if (clientModal === 'edit' && editingClient) {
         await updateClient(editingClient.id, data);
       } else {

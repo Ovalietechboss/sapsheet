@@ -32,7 +32,7 @@ const makeTs = (overrides: Partial<Timesheet> = {}): Timesheet => ({
   duration: 4,
   frais_repas: 0,
   frais_transport: 0,
-  frais_autres: 0,
+  frais_autres: 0, ik_km: 0, ik_rate: 0.603, ik_amount: 0,
   status: 'draft',
   created_at: Date.now(),
   updated_at: Date.now(),

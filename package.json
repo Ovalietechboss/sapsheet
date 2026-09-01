@@ -2,7 +2,6 @@
   "name": "domitemps",
   "version": "1.1.0",
   "description": "DomiTemps - Gestion de temps pour assistantes a domicile",
-  "main": "index.ts",
   "scripts": {
     "dev": "vite",
     "web": "vite",
@@ -66,8 +65,10 @@
     "@react-native-async-storage/async-storage": "~1.17.12",
     "@testing-library/jest-native": "^5.4.3",
     "@testing-library/react-native": "^12.1.2",
+    "@types/jest": "^29.5.14",
     "@types/node": "^20.1.0",
     "@types/react": "~18.2.14",
+    "@types/react-dom": "~18.2",
     "@types/react-native": "0.72.2",
     "@types/uuid": "^9.0.2",
     "jest": "^29.5.0",

@@ -40,9 +40,9 @@ const mockClient: Client = {
   address: '12 rue des Lilas, 75001 Paris',
   facturation_mode: 'CESU',
   hourly_rate: 15,
-  mandataire_name: 'ADMR Paris',
-  mandataire_email: 'admr@paris.fr',
-  mandataire_siren: '123456789',
+  // mandataire_name / _email / _siren retires : colonnes heritees d'avant la table
+  // « mandataires », encore presentes en base mais que l'application n'utilise plus
+  // nulle part. Le jeu d'essai decrivait un client qui ne correspond plus au modele.
   created_at: Date.now(),
   updated_at: Date.now(),
 };
@@ -50,9 +50,6 @@ const mockClient: Client = {
 const mockClientClassic: Client = {
   ...mockClient,
   facturation_mode: 'CLASSICAL',
-  mandataire_name: undefined,
-  mandataire_email: undefined,
-  mandataire_siren: undefined,
 };
 
 const mockTimesheet: Timesheet = {

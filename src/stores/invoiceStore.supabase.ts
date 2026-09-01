@@ -24,6 +24,9 @@ export interface Invoice {
   paid_at?: number | null;
   /** Si renseigné : ce document est un AVOIR sur la facture dont c'est le numéro (total négatif). */
   credit_of?: string | null;
+  /** Mode de facturation du client au moment de l'emission. Colonne bien presente en
+   *  base — seul le type l'ignorait, ce qui produisait 6 erreurs TypeScript. */
+  facturation_mode?: 'CESU' | 'CLASSICAL';
   /** Date de transmission (ms) : envoi email ou remise en main propre. */
   sent_at?: number | null;
   /** Comment le document a ete transmis. NULL tant qu'il ne l'est pas.
