@@ -13,6 +13,7 @@ import { nextInvoiceNumber } from '../services/invoiceNumbering';
 import { generateAndSharePDF, generatePdfBase64 } from '../utils/pdfGenerator';
 import { supabase } from '../lib/supabase';
 import { isDureeDirecte } from '../utils/timesheetMode';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 const MONTHS = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
@@ -21,6 +22,31 @@ const MONTHS = [
 
 const STATUS_LABEL: Record<ClientDocStatus, string> = { pending: 'À générer', generated: 'Généré', sent: 'Envoyé', error: 'Erreur' };
 const STATUS_COLOR: Record<ClientDocStatus, string> = { pending: '#FF9500', generated: '#007AFF', sent: '#34C759', error: '#FF3B30' };
+const STATUS_ICONE: Record<ClientDocStatus, string> = { pending: '○', generated: '📄', sent: '✉️', error: '⚠️' };
+
+/**
+ * Badge d'état du document, identique pour un relevé CESU et pour une facture.
+ * Sur mobile on n'affiche que l'icône : la ligne y est déjà chargée, et le libellé complet
+ * reste accessible par `title` (appui long, ou survol sur écran large).
+ */
+function BadgeDoc({ etat, sentAt, compact }: { etat: ClientDocStatus; sentAt: number | null; compact: boolean }) {
+  const libelle = etat === 'sent' && sentAt
+    ? `Envoyé le ${new Date(sentAt).toLocaleDateString('fr-FR')}`
+    : STATUS_LABEL[etat];
+  return (
+    <span title={libelle} style={{
+      display: 'inline-flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap',
+      padding: compact ? '3px 7px' : '3px 10px', borderRadius: '12px',
+      fontSize: '12px', fontWeight: 'bold',
+      backgroundColor: STATUS_COLOR[etat] + '22', color: STATUS_COLOR[etat],
+      border: `1px solid ${STATUS_COLOR[etat]}44`,
+    }}>
+      <span style={{ fontSize: '13px', lineHeight: 1 }}>{STATUS_ICONE[etat]}</span>
+      {!compact && <span>{libelle}</span>}
+    </span>
+  );
+}
+
 const PERIOD_STATUS_LABEL = { open: 'Ouvert', locked: 'Clôturé', archived: 'Archivé' };
 const PERIOD_STATUS_COLOR = { open: '#34C759', locked: '#FF9500', archived: '#888' };
 
@@ -29,6 +55,10 @@ type SubView = 'documents' | 'chronologie' | 'synthese';
 interface ClientRow {
   clientId: string;
   clientName: string;
+  /** Etat du document, unifie entre les deux modes (voir docStateFor). */
+  docState: ClientDocStatus;
+  /** Horodatage d'envoi email, quel que soit le mode. Null si jamais envoye. */
+  docSentAt: number | null;
   facturationMode: 'CESU' | 'CLASSICAL';
   clientType: 'PARTICULIER' | 'SOCIETE';
   clientEmail?: string;
@@ -39,7 +69,6 @@ interface ClientRow {
   totalFrais: number;
   totalAmount: number;
   hasDraftTimesheets: boolean;
-  docStatus: ClientDocStatus;
   recipientEmail?: string;
 }
 
@@ -81,6 +110,8 @@ export default function BilansTab() {
   const [societeLines, setSocieteLines] = useState<InvoiceLine[]>([{ designation: '', quantity: 1, unit_price: 0 }]);
   const [societeDate, setSocieteDate] = useState('');
 
+  const isMobile = useIsMobile();
+
   const years = Array.from({ length: 5 }, (_, i) => currentDate.getFullYear() - 3 + i).reverse();
 
   const currentPeriod = getPeriod(selectedMonth, selectedYear);
@@ -108,7 +139,34 @@ export default function BilansTab() {
       const mandataire = mandataires.find((m) => m.id === client.mandataire_id);
       const persisted = currentPeriod ? getClientStatus(currentPeriod.id, client.id) : null;
 
+      // Etat du document : DEUX sources de verite selon le mode, et c'est voulu.
+      //  - CESU      : l'envoi est trace dans billing_period_clients (bouton de cet ecran).
+      //  - CLASSIQUE : l'envoi se fait depuis l'onglet Factures, qui ecrit invoices.sent_at.
+      // On lit `sent_at` et jamais `invoices.status` : ce dernier vaut « emise », il peut etre
+      // passe a la main sans qu'aucun email ne soit parti.
+      const facture = client.facturation_mode === 'CLASSICAL'
+        ? invoices.find((i) => i.client_id === client.id && i.month === selectedMonth && i.year === selectedYear)
+        : null;
+
+      let docState: ClientDocStatus;
+      let docSentAt: number | null = null;
+      if (persisted?.status === 'error') {
+        docState = 'error';
+      } else if (client.facturation_mode === 'CESU') {
+        docState = (persisted?.status as ClientDocStatus) || 'pending';
+        docSentAt = persisted?.sent_at ?? null;
+      } else if (!facture) {
+        docState = 'pending';
+      } else if (facture.sent_at) {
+        docState = 'sent';
+        docSentAt = facture.sent_at;
+      } else {
+        docState = 'generated';
+      }
+
       return {
+        docState,
+        docSentAt,
         clientId: client.id,
         clientName: [client.titre, client.first_name, client.name].filter(Boolean).join(' '),
         facturationMode: client.facturation_mode,
@@ -121,7 +179,6 @@ export default function BilansTab() {
         totalFrais,
         totalAmount: totalEarnings + totalFrais,
         hasDraftTimesheets: cts.some((ts) => ts.status === 'draft'),
-        docStatus: (persisted?.status as ClientDocStatus) || 'pending',
         recipientEmail: mandataire?.email || client.email,
       };
     });
@@ -144,7 +201,7 @@ export default function BilansTab() {
 
     const activeRows = rows.filter((r) => r.timesheetCount > 0);
     const warnings: string[] = [];
-    const notGenerated = activeRows.filter((r) => r.docStatus === 'pending');
+    const notGenerated = activeRows.filter((r) => r.docState === 'pending');
     const draftTs = activeRows.filter((r) => r.hasDraftTimesheets);
     if (notGenerated.length > 0) warnings.push(`${notGenerated.length} client${notGenerated.length > 1 ? 's' : ''} sans document généré`);
     if (draftTs.length > 0) warnings.push(`${draftTs.length} client${draftTs.length > 1 ? 's' : ''} avec pointages non validés`);
@@ -158,7 +215,7 @@ export default function BilansTab() {
       totalMontant: activeRows.reduce((s, r) => s + r.totalAmount, 0),
       warnings,
     };
-  }, [monthTimesheets, clients, mandataires, currentPeriod, getClientStatus]);
+  }, [monthTimesheets, clients, mandataires, currentPeriod, getClientStatus, invoices, selectedMonth, selectedYear]);
 
   // ── User profile pour templates ────────────────────────────────────────────
 
@@ -229,7 +286,10 @@ export default function BilansTab() {
             await addInvoice({
               invoice_number: invoiceNumber,
               client_id: client.id,
-              status: 'sent',
+              // Generer un PDF n'est pas l'envoyer. La facture nait en brouillon, comme la
+              // facture independante societe : elle passe « envoyee » soit par l'envoi email
+              // depuis l'onglet Factures, soit a la main via le selecteur de statut.
+              status: 'draft',
               total_amount: row.totalAmount,
               month: selectedMonth,
               year: selectedYear,
@@ -330,7 +390,7 @@ export default function BilansTab() {
       return;
     }
     const drafts = targets.filter((r) => r.hasDraftTimesheets).length;
-    const already = targets.filter((r) => r.docStatus === 'sent').length;
+    const already = targets.filter((r) => r.docState === 'sent').length;
     const details = [
       drafts > 0 ? `⚠️ ${drafts} client${drafts > 1 ? 's ont' : ' a'} des pointages NON VALIDÉS.` : '',
       already > 0 ? `${already} déjà envoyé${already > 1 ? 's' : ''} — ils seront renvoyés.` : '',
@@ -431,7 +491,7 @@ export default function BilansTab() {
     const targets = allClients.filter((r) =>
       r.facturationMode === mode &&
       r.timesheetCount > 0 &&
-      (force || r.docStatus === 'pending')
+      (force || r.docState === 'pending')
     );
     if (targets.length === 0) return;
     setBulkProgress({ done: 0, total: targets.length, mode });
@@ -477,7 +537,7 @@ export default function BilansTab() {
       alert(`Aucun client ${mode === 'CESU' ? 'CESU' : 'classique'} avec des pointages ce mois.`);
       return;
     }
-    const alreadyGen = targets.filter((r) => r.docStatus === 'generated' || r.docStatus === 'sent').length;
+    const alreadyGen = targets.filter((r) => r.docState === 'generated' || r.docState === 'sent').length;
     if (alreadyGen > 0) {
       setConfirmBulk({ mode, alreadyGen, pending: targets.length - alreadyGen });
       return;
@@ -796,17 +856,11 @@ export default function BilansTab() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{
-                          padding: '3px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold',
-                          backgroundColor: STATUS_COLOR[row.docStatus] + '22', color: STATUS_COLOR[row.docStatus],
-                          border: `1px solid ${STATUS_COLOR[row.docStatus]}44`,
-                        }}>
-                          {STATUS_LABEL[row.docStatus]}
-                        </span>
+                        <BadgeDoc etat={row.docState} sentAt={row.docSentAt} compact={isMobile} />
                         {row.timesheetCount > 0 && !isLocked && (
                           <button disabled={generating === row.clientId} onClick={() => handleGenerate(row)}
                             style={{ padding: '7px 14px', backgroundColor: generating === row.clientId ? '#ccc' : color, color: 'white', border: 'none', borderRadius: '6px', cursor: generating === row.clientId ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                            {generating === row.clientId ? '...' : isCESU ? (row.docStatus === 'pending' ? 'Pointage CESU' : 'Regénérer') : (row.docStatus === 'pending' ? 'Facture' : 'Regénérer')}
+                            {generating === row.clientId ? '...' : isCESU ? (row.docState === 'pending' ? 'Pointage CESU' : 'Regénérer') : (row.docState === 'pending' ? 'Facture' : 'Regénérer')}
                           </button>
                         )}
                         {isCESU && row.timesheetCount > 0 && !isLocked && (
@@ -815,7 +869,7 @@ export default function BilansTab() {
                             onClick={() => sendCesuEmail(row)}
                             title={row.recipientEmail ? `Envoyer à ${row.recipientEmail}` : 'Aucun email destinataire (mandataire ou client)'}
                             style={{ padding: '7px 14px', backgroundColor: (sendingId === row.clientId || !!sendProgress || !row.recipientEmail) ? '#ccc' : '#5856D6', color: 'white', border: 'none', borderRadius: '6px', cursor: (sendingId === row.clientId || !!sendProgress || !row.recipientEmail) ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                            {sendingId === row.clientId ? 'Envoi…' : row.docStatus === 'sent' ? '✉️ Renvoyer' : '✉️ Envoyer'}
+                            {sendingId === row.clientId ? 'Envoi…' : row.docState === 'sent' ? '✉️ Renvoyer' : '✉️ Envoyer'}
                           </button>
                         )}
                       </div>
@@ -953,6 +1007,7 @@ export default function BilansTab() {
                   <tr style={{ backgroundColor: '#f5f5f5' }}>
                     <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: '600', color: '#666', borderBottom: '2px solid #ddd' }}>Client</th>
                     <th style={{ padding: '12px 14px', textAlign: 'center', fontWeight: '600', color: '#666', borderBottom: '2px solid #ddd' }}>Mode</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center', fontWeight: '600', color: '#666', borderBottom: '2px solid #ddd' }}>Document</th>
                     <th style={{ padding: '12px 14px', textAlign: 'right', fontWeight: '600', color: '#666', borderBottom: '2px solid #ddd' }}>Heures</th>
                     <th style={{ padding: '12px 14px', textAlign: 'right', fontWeight: '600', color: '#666', borderBottom: '2px solid #ddd' }}>Salaire</th>
                     <th style={{ padding: '12px 14px', textAlign: 'right', fontWeight: '600', color: '#666', borderBottom: '2px solid #ddd' }}>Frais</th>
@@ -967,7 +1022,7 @@ export default function BilansTab() {
                       <React.Fragment key={group.mandataire?.id || '__none__'}>
                         {group.mandataire && (
                           <tr style={{ background: '#E8F4FF' }}>
-                            <td colSpan={6} style={{ padding: '8px 14px', fontWeight: 'bold', color: '#1a6fb5', fontSize: '12px' }}>
+                            <td colSpan={7} style={{ padding: '8px 14px', fontWeight: 'bold', color: '#1a6fb5', fontSize: '12px' }}>
                               {[group.mandataire.titre, group.mandataire.first_name, group.mandataire.name].filter(Boolean).join(' ')} — {group.mandataire.association_name}
                             </td>
                           </tr>
@@ -983,6 +1038,9 @@ export default function BilansTab() {
                                 {row.facturationMode === 'CESU' ? 'CESU' : 'CLASS.'}
                               </span>
                             </td>
+                            <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                              <BadgeDoc etat={row.docState} sentAt={row.docSentAt} compact={isMobile} />
+                            </td>
                             <td style={{ padding: '10px 14px', textAlign: 'right' }}>{row.totalHours.toFixed(2)}h</td>
                             <td style={{ padding: '10px 14px', textAlign: 'right' }}>{row.totalEarnings.toFixed(2)}€</td>
                             <td style={{ padding: '10px 14px', textAlign: 'right' }}>{row.totalFrais > 0 ? `${row.totalFrais.toFixed(2)}€` : '—'}</td>
@@ -993,7 +1051,7 @@ export default function BilansTab() {
                     );
                   })}
                   <tr style={{ backgroundColor: '#5b3db5', color: 'white', fontWeight: 'bold' }}>
-                    <td colSpan={2} style={{ padding: '14px', fontSize: '14px' }}>TOTAUX — {totalClientsActive} client{totalClientsActive > 1 ? 's' : ''}</td>
+                    <td colSpan={3} style={{ padding: '14px', fontSize: '14px' }}>TOTAUX — {totalClientsActive} client{totalClientsActive > 1 ? 's' : ''}</td>
                     <td style={{ padding: '14px', textAlign: 'right' }}>{totalHours.toFixed(2)}h</td>
                     <td style={{ padding: '14px', textAlign: 'right' }}>{totalEarnings.toFixed(2)}€</td>
                     <td style={{ padding: '14px', textAlign: 'right' }}>{totalFrais.toFixed(2)}€</td>
