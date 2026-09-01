@@ -85,22 +85,25 @@ export default function HomePage() {
             // viewport-fit=cover + status-bar-style black-translucent font dessiner
             // l'app SOUS la barre d'etat : sans ce decalage, le bouton passe sous
             // l'encoche ou la Dynamic Island. env() vaut 0 la ou il n'y en a pas.
-            top: 'calc(10px + env(safe-area-inset-top))',
+            top: 'calc(8px + env(safe-area-inset-top))',
             left: 'calc(10px + env(safe-area-inset-left))',
             zIndex: 10000,
-            // Sans box-sizing, le padding de 16px s'AJOUTE au minHeight : le bouton
-            // mesurait 81px au lieu de 56 et recouvrait le titre de chaque page
-            // (mesure faite sur une capture Pixel 9a le 01/09/2026).
+            // Dimensions FIXES, pas des minima : avec minWidth/minHeight, le glyphe
+            // et le padding poussaient la boite a ~63x82px — un rectangle, qui en
+            // plus debordait des 70px reserves au-dessus du contenu et recouvrait
+            // la carte d'en-tete (mesure sur capture Pixel 9a du 01/09/2026).
+            // 44px = cible tactile minimale recommandee, et 8 + 44 = 52 < 60 :
+            // le contenu passe juste dessous sans etre recouvert.
             boxSizing: 'border-box',
-            minWidth: '56px',
-            minHeight: '56px',
-            padding: '16px',
+            width: '44px',
+            height: '44px',
+            padding: 0,
             backgroundColor: '#007AFF',
             color: 'white',
             border: 'none',
             borderRadius: '12px',
             cursor: 'pointer',
-            fontSize: '28px',
+            fontSize: '22px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -196,9 +199,9 @@ export default function HomePage() {
       <div
         style={{
           flex: 1,
-          padding: isMobile ? '70px 20px 20px 20px' : '40px',
+          padding: isMobile ? '60px 20px 20px 20px' : '40px',
           paddingTop: isMobile
-            ? 'calc(70px + env(safe-area-inset-top))'
+            ? 'calc(60px + env(safe-area-inset-top))'
             : 'calc(40px + env(safe-area-inset-top))',
           paddingBottom: 'calc(20px + env(safe-area-inset-bottom))',
           overflowY: 'auto',
