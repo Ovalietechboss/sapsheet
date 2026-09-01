@@ -23,7 +23,10 @@ export interface BillingPeriodClient {
   client_id: string;
   status: ClientDocStatus;
   doc_generated_at?: number;
-  sent_at?: number;
+  sent_at?: number | null;
+  /** Comment le document a ete transmis. NULL tant qu'il ne l'est pas.
+   *  'email' = envoi depuis l'application ; 'hand' = remis en main propre. */
+  sent_channel?: 'email' | 'hand' | null;
   recipient_email?: string;
   notes?: string;
   created_at: number;
@@ -44,7 +47,7 @@ interface BillingPeriodStore {
   upsertClientStatus: (
     periodId: string,
     clientId: string,
-    updates: Partial<Pick<BillingPeriodClient, 'status' | 'doc_generated_at' | 'sent_at' | 'recipient_email' | 'notes'>>
+    updates: Partial<Pick<BillingPeriodClient, 'status' | 'doc_generated_at' | 'sent_at' | 'sent_channel' | 'recipient_email' | 'notes'>>
   ) => Promise<void>;
 
   // Clôturer un mois (open → locked)

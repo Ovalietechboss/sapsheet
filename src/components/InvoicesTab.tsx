@@ -274,7 +274,7 @@ export default function InvoicesTab() {
         throw new Error(error?.message || data?.error || 'Échec de l\'envoi');
       }
       // Marque envoyée + horodate (sauf si déjà payée, on garde le statut payé).
-      const updates: any = { sent_at: Date.now() };
+      const updates: any = { sent_at: Date.now(), sent_channel: 'email' };
       if (invoice.status === 'draft') updates.status = 'sent';
       await updateInvoice(invoice.id, updates);
       alert(`Email envoyé à ${to}.`);

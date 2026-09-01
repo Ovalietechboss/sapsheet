@@ -29,10 +29,16 @@ const STATUS_ICONE: Record<ClientDocStatus, string> = { pending: '○', generate
  * Sur mobile on n'affiche que l'icône : la ligne y est déjà chargée, et le libellé complet
  * reste accessible par `title` (appui long, ou survol sur écran large).
  */
-function BadgeDoc({ etat, sentAt, compact }: { etat: ClientDocStatus; sentAt: number | null; compact: boolean }) {
-  const libelle = etat === 'sent' && sentAt
-    ? `Envoyé le ${new Date(sentAt).toLocaleDateString('fr-FR')}`
+function BadgeDoc({ etat, sentAt, canal, compact }: {
+  etat: ClientDocStatus; sentAt: number | null; canal: 'email' | 'hand' | null; compact: boolean;
+}) {
+  const remis = canal === 'hand';
+  const date = sentAt ? new Date(sentAt).toLocaleDateString('fr-FR') : null;
+  const libelle = etat === 'sent' && date
+    ? (remis ? `Remis en main propre le ${date}` : `Envoyé par email le ${date}`)
     : STATUS_LABEL[etat];
+  // Une remise en main propre n'est pas un envoi : elle a sa propre icone.
+  const icone = etat === 'sent' && remis ? '🤝' : STATUS_ICONE[etat];
   return (
     <span title={libelle} style={{
       display: 'inline-flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap',
@@ -41,7 +47,7 @@ function BadgeDoc({ etat, sentAt, compact }: { etat: ClientDocStatus; sentAt: nu
       backgroundColor: STATUS_COLOR[etat] + '22', color: STATUS_COLOR[etat],
       border: `1px solid ${STATUS_COLOR[etat]}44`,
     }}>
-      <span style={{ fontSize: '13px', lineHeight: 1 }}>{STATUS_ICONE[etat]}</span>
+      <span style={{ fontSize: '13px', lineHeight: 1 }}>{icone}</span>
       {!compact && <span>{libelle}</span>}
     </span>
   );
@@ -57,8 +63,12 @@ interface ClientRow {
   clientName: string;
   /** Etat du document, unifie entre les deux modes (voir docStateFor). */
   docState: ClientDocStatus;
-  /** Horodatage d'envoi email, quel que soit le mode. Null si jamais envoye. */
+  /** Horodatage de transmission, quel que soit le mode. Null si jamais transmis. */
   docSentAt: number | null;
+  /** Comment il a ete transmis : par email, ou remis en main propre. */
+  docChannel: 'email' | 'hand' | null;
+  /** Facture correspondante (clients classiques), pour pouvoir la mettre a jour. */
+  invoiceId: string | null;
   facturationMode: 'CESU' | 'CLASSICAL';
   clientType: 'PARTICULIER' | 'SOCIETE';
   clientEmail?: string;
@@ -150,16 +160,19 @@ export default function BilansTab() {
 
       let docState: ClientDocStatus;
       let docSentAt: number | null = null;
+      let docChannel: 'email' | 'hand' | null = null;
       if (persisted?.status === 'error') {
         docState = 'error';
       } else if (client.facturation_mode === 'CESU') {
         docState = (persisted?.status as ClientDocStatus) || 'pending';
         docSentAt = persisted?.sent_at ?? null;
+        docChannel = persisted?.sent_channel ?? null;
       } else if (!facture) {
         docState = 'pending';
       } else if (facture.sent_at) {
         docState = 'sent';
         docSentAt = facture.sent_at;
+        docChannel = facture.sent_channel ?? null;
       } else {
         docState = 'generated';
       }
@@ -167,6 +180,8 @@ export default function BilansTab() {
       return {
         docState,
         docSentAt,
+        docChannel,
+        invoiceId: facture?.id ?? null,
         clientId: client.id,
         clientName: [client.titre, client.first_name, client.name].filter(Boolean).join(' '),
         facturationMode: client.facturation_mode,
@@ -364,7 +379,7 @@ export default function BilansTab() {
       }
 
       await upsertClientStatus(period.id, row.clientId, {
-        status: 'sent', sent_at: Date.now(), recipient_email: to,
+        status: 'sent', sent_at: Date.now(), sent_channel: 'email', recipient_email: to,
       });
       if (!opts?.silent) alert(`Email envoyé à ${to}.`);
       return true;
@@ -374,6 +389,55 @@ export default function BilansTab() {
         alert(`Échec de l'envoi : ${e?.message || e}\n\n(La fonction send-invoice est-elle déployée et la clé Resend configurée ?)`);
       }
       return false;
+    } finally {
+      setSendingId(null);
+    }
+  };
+
+  // ── Remise en main propre ───────────────────────────────────────────────
+  //
+  // Tout ne part pas par email : certains clients recoivent leur document de la
+  // main a la main. Sans ce marquage, ces documents restaient « Genere » a vie,
+  // sans aucun moyen de rectifier — constate le 01/09/2026.
+  //
+  // On ecrit dans la meme colonne que l'envoi email (sent_at), en precisant le
+  // canal. Le suivi reflete ainsi la realite, et l'ecran distingue les deux.
+  const marquerRemis = async (row: ClientRow) => {
+    if (!user || isLocked) return;
+    if (row.docState === 'pending') {
+      alert("Générez d'abord le document : on ne remet pas un document qui n'existe pas.");
+      return;
+    }
+
+    const annule = row.docState === 'sent';
+    if (annule && row.docChannel === 'email') {
+      alert("Ce document a été envoyé par email : son envoi ne peut pas être annulé ici.");
+      return;
+    }
+    const question = annule
+      ? `Annuler la remise en main propre pour ${row.clientName} ?`
+      : `Marquer le document de ${row.clientName} comme remis en main propre ?`;
+    if (!window.confirm(question)) return;
+
+    setSendingId(row.clientId);
+    try {
+      const isCESU = row.facturationMode === 'CESU';
+      if (isCESU) {
+        const period = await getOrCreatePeriod(selectedMonth, selectedYear);
+        await upsertClientStatus(period.id, row.clientId, annule
+          ? { status: 'generated', sent_at: null, sent_channel: null }
+          : { status: 'sent', sent_at: Date.now(), sent_channel: 'hand' });
+      } else {
+        if (!row.invoiceId) { alert('Facture introuvable pour ce mois.'); return; }
+        await updateInvoice(row.invoiceId, annule
+          ? { status: 'draft', sent_at: null, sent_channel: null }
+          : { status: 'sent', sent_at: Date.now(), sent_channel: 'hand' });
+      }
+    } catch (e: any) {
+      console.error('Marquage remis échoué:', e);
+      alert(`Échec : ${e?.message || e}
+
+(La colonne sent_channel existe-t-elle en base ? Voir supabase-migration-sent-channel.sql)`);
     } finally {
       setSendingId(null);
     }
@@ -856,7 +920,7 @@ export default function BilansTab() {
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <BadgeDoc etat={row.docState} sentAt={row.docSentAt} compact={isMobile} />
+                        <BadgeDoc etat={row.docState} sentAt={row.docSentAt} canal={row.docChannel} compact={isMobile} />
                         {row.timesheetCount > 0 && !isLocked && (
                           <button disabled={generating === row.clientId} onClick={() => handleGenerate(row)}
                             style={{ padding: '7px 14px', backgroundColor: generating === row.clientId ? '#ccc' : color, color: 'white', border: 'none', borderRadius: '6px', cursor: generating === row.clientId ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
@@ -870,6 +934,20 @@ export default function BilansTab() {
                             title={row.recipientEmail ? `Envoyer à ${row.recipientEmail}` : 'Aucun email destinataire (mandataire ou client)'}
                             style={{ padding: '7px 14px', backgroundColor: (sendingId === row.clientId || !!sendProgress || !row.recipientEmail) ? '#ccc' : '#5856D6', color: 'white', border: 'none', borderRadius: '6px', cursor: (sendingId === row.clientId || !!sendProgress || !row.recipientEmail) ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
                             {sendingId === row.clientId ? 'Envoi…' : row.docState === 'sent' ? '✉️ Renvoyer' : '✉️ Envoyer'}
+                          </button>
+                        )}
+                        {/* Remise en main propre. Masque pour un document deja parti par
+                            email : on n'annule pas un envoi, et il est deja marque. */}
+                        {row.docState !== 'pending' && !isLocked
+                          && !(row.docState === 'sent' && row.docChannel === 'email') && (
+                          <button disabled={sendingId === row.clientId} onClick={() => marquerRemis(row)}
+                            title={row.docState === 'sent' ? 'Annuler la remise en main propre' : 'Marquer comme remis en main propre'}
+                            style={{ padding: '7px 12px', backgroundColor: 'white',
+                              color: row.docState === 'sent' ? '#888' : '#5856D6',
+                              border: `1px solid ${row.docState === 'sent' ? '#ccc' : '#5856D6'}`,
+                              borderRadius: '6px', cursor: sendingId === row.clientId ? 'not-allowed' : 'pointer',
+                              fontSize: '13px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                            {row.docState === 'sent' ? (isMobile ? '↩' : '↩ Annuler') : (isMobile ? '🤝' : '🤝 Remis')}
                           </button>
                         )}
                       </div>
@@ -1039,7 +1117,7 @@ export default function BilansTab() {
                               </span>
                             </td>
                             <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                              <BadgeDoc etat={row.docState} sentAt={row.docSentAt} compact={isMobile} />
+                              <BadgeDoc etat={row.docState} sentAt={row.docSentAt} canal={row.docChannel} compact={isMobile} />
                             </td>
                             <td style={{ padding: '10px 14px', textAlign: 'right' }}>{row.totalHours.toFixed(2)}h</td>
                             <td style={{ padding: '10px 14px', textAlign: 'right' }}>{row.totalEarnings.toFixed(2)}€</td>

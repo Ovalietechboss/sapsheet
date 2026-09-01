@@ -24,8 +24,11 @@ export interface Invoice {
   paid_at?: number | null;
   /** Si renseigné : ce document est un AVOIR sur la facture dont c'est le numéro (total négatif). */
   credit_of?: string | null;
-  /** Date d'envoi par email (ms). */
+  /** Date de transmission (ms) : envoi email ou remise en main propre. */
   sent_at?: number | null;
+  /** Comment le document a ete transmis. NULL tant qu'il ne l'est pas.
+   *  'email' = envoi depuis l'application ; 'hand' = remis en main propre. */
+  sent_channel?: 'email' | 'hand' | null;
   generated_at: number;
   created_at: number;
   updated_at: number;
