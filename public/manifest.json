@@ -1,7 +1,7 @@
 {
   "name": "DomiTemps",
   "short_name": "DomiTemps",
-  "description": "Gestion des heures et facturation pour assistantes de vie",
+  "description": "Pointages, relevés CESU et factures pour les intervenants à domicile",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -10,6 +10,24 @@
   "theme_color": "#007AFF",
   "icons": [
     {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
       "src": "/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
@@ -17,7 +35,10 @@
     }
   ],
   "screenshots": [],
-  "categories": ["business", "productivity"],
+  "categories": [
+    "business",
+    "productivity"
+  ],
   "shortcuts": [
     {
       "name": "Timesheet",
