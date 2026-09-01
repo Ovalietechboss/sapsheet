@@ -8,13 +8,31 @@ export default function ResetPasswordPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [validSession, setValidSession] = useState(false);
 
-  // Supabase redirige avec un token dans l'URL — il faut l'échanger contre une session
+  // Supabase redirige avec un jeton dans l'URL, qu'il échange lui-même contre une session.
+  //
+  // S'abonner seul ne suffit PAS : le client Supabase traite l'URL au chargement du module,
+  // donc AVANT que React ne monte cette page. L'événement PASSWORD_RECOVERY était souvent
+  // déjà émis quand on s'y abonnait, et la page affichait « lien invalide ou expiré » alors
+  // que la session était parfaitement valide — l'utilisateur se retrouvait connecté sans
+  // jamais pouvoir choisir son mot de passe. Constaté le 01/09/2026.
+  //
+  // On interroge donc d'abord la session existante, et on garde l'abonnement pour le cas
+  // où l'échange se termine après le montage.
   useEffect(() => {
-    supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
+    let actif = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (actif && data.session) setValidSession(true);
+    });
+    const { data: abonnement } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!actif) return;
+      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
         setValidSession(true);
       }
     });
+    return () => {
+      actif = false;
+      abonnement.subscription.unsubscribe();
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
