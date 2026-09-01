@@ -142,6 +142,34 @@ export default function AdminPage() {
       if (authError) throw new Error(authError.message);
       if (!authData.user) throw new Error('Création du compte auth échouée');
 
+      // Quand l'email possède DÉJÀ un compte, Supabase ne renvoie pas d'erreur : pour
+      // empêcher de deviner quelles adresses sont inscrites, il retourne un utilisateur
+      // factice, avec un identifiant aléatoire et une liste `identities` vide.
+      // Insérer cet identifiant violait la clé étrangère users_auth_id_fkey, qui exige
+      // une ligne réelle dans auth.users — l'erreur était incompréhensible pour vous.
+      // On détecte le cas et on propose ce qui a du sens : renvoyer une invitation.
+      const compteDejaExistant = !authData.user.identities || authData.user.identities.length === 0;
+      if (compteDejaExistant) {
+        if (createForm.invite) {
+          const { error: renvoiError } = await supabase.auth.resetPasswordForEmail(
+            createForm.email,
+            { redirectTo: window.location.origin + '/reset-password' },
+          );
+          if (renvoiError) {
+            throw new Error("Cet email a déjà un compte, et l'invitation n'a pas pu être renvoyée : "
+              + renvoiError.message);
+          }
+          alert("Cet email a déjà un compte : aucun nouveau compte n'a été créé." + "\n\n"
+            + "Une invitation vient de lui être renvoyée — la personne pourra redéfinir son mot de passe.");
+        } else {
+          throw new Error("Cet email a déjà un compte. Cochez « Envoyer une invitation » "
+            + "pour lui renvoyer un lien de connexion.");
+        }
+        setShowCreateUser(false);
+        setCreateForm({ email: '', password: '', display_name: '', type: 'assistant', invite: true });
+        return;
+      }
+
       // 2. Insérer dans la table users
       const now = Date.now();
       const { error: insertError } = await supabase.from('users').insert({
