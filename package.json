@@ -1,6 +1,6 @@
 {
   "name": "domitemps",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "DomiTemps - Gestion de temps pour assistantes a domicile",
   "scripts": {
     "dev": "vite",
