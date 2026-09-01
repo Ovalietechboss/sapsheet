@@ -260,9 +260,12 @@ export default function AdminPage() {
     // qui ne peut pas vivre dans un navigateur. Sans ce rappel, il reste un compte
     // orphelin dans auth.users — invisible ici, mais qui empêche de recréer la même
     // adresse plus tard (violation de users_auth_id_fkey).
+    // « Authentication → Users » prete a confusion avec la TABLE users, que l'on vient
+    // justement de vider : on precise donc explicitement qu'il ne s'agit pas d'elle.
     alert("Profil et données supprimés." + "\n\n"
-      + "⚠️ Le compte de connexion de " + u.email + " existe toujours." + "\n"
-      + "Pour le supprimer complètement : Supabase → Authentication → Users.");
+      + "⚠️ Le compte de connexion de " + u.email + " existe toujours : il faut le supprimer à part." + "\n\n"
+      + "Dans Supabase, menu de gauche → Authentication → onglet Users." + "\n"
+      + "Ce n'est PAS la table « users » du Table Editor, que cette suppression vient de vider.");
     await loadData();
   };
 
