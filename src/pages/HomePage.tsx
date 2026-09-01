@@ -85,6 +85,10 @@ export default function HomePage() {
             top: '10px',
             left: '10px',
             zIndex: 10000,
+            // Sans box-sizing, le padding de 16px s'AJOUTE au minHeight : le bouton
+            // mesurait 81px au lieu de 56 et recouvrait le titre de chaque page
+            // (mesure faite sur une capture Pixel 9a le 01/09/2026).
+            boxSizing: 'border-box',
             minWidth: '56px',
             minHeight: '56px',
             padding: '16px',

@@ -282,8 +282,11 @@ export default function ClientsTab() {
             const linkedClients = getClientsForMandataire(m.id);
             return (
               <div key={m.id} style={{ backgroundColor: 'white', padding: '18px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: '1px solid #e0e0e0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                  <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start',
+                      // flexWrap + minWidth:0 : sans eux la colonne de texte refuse de
+                      // retrecir et pousse les boutons hors de l'ecran sur mobile.
+                      gap: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                       <h4 style={{ margin: 0, fontSize: '17px' }}>{fullName(m.titre, m.first_name, m.name)}</h4>
                     </div>
@@ -557,8 +560,11 @@ export default function ClientsTab() {
     const mandataire = getMandataire(client.mandataire_id);
     return (
       <div key={client.id} style={{ backgroundColor: 'white', padding: '18px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.08)', border: `2px solid ${borderColor}` }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-          <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => openEditClient(client)}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start',
+                      // flexWrap + minWidth:0 : sans eux la colonne de texte refuse de
+                      // retrecir et pousse les boutons hors de l'ecran sur mobile.
+                      gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 220px', minWidth: 0, cursor: 'pointer' }} onClick={() => openEditClient(client)}>
             <h4 style={{ marginBottom: '6px', fontSize: '17px' }}>
               {fullName(client.titre, client.first_name, client.name)}
               {client.client_type === 'SOCIETE' && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#5856D6', fontWeight: 'bold' }}>🏢 SOCIÉTÉ</span>}
