@@ -642,7 +642,7 @@ export default function AdminPage() {
                         borderRadius: '8px', backgroundColor: createForm.type === t ? '#EBF4FF' : 'white',
                         color: createForm.type === t ? '#007AFF' : '#555', fontWeight: '600', fontSize: '13px', cursor: 'pointer',
                       }}>
-                      {t === 'assistant' ? 'Assistante' : 'Employeur'}
+                      {t === 'assistant' ? 'Assistant(e)' : 'Employeur'}
                     </button>
                   ))}
                 </div>

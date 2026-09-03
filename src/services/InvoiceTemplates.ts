@@ -129,7 +129,7 @@ export const generateCESUTemplate = (
 
   <div class="info-grid">
     <div class="info-box">
-      <h3>Prestataire (Assistante)</h3>
+      <h3>Prestataire</h3>
       <p><strong>${user.displayName}</strong></p>
       ${user.address ? `<p>${user.address}</p>` : ''}
       ${user.phone ? `<p>${user.phone}</p>` : ''}

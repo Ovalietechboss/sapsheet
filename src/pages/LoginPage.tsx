@@ -275,7 +275,7 @@ export default function LoginPage() {
                       cursor: 'pointer',
                     }}
                   >
-                    {t === 'assistant' ? '👩‍⚕️ Assistante' : '🏠 Employeur'}
+                    {t === 'assistant' ? '🧑‍⚕️ Assistant(e)' : '🏠 Employeur'}
                   </button>
                 ))}
               </div>

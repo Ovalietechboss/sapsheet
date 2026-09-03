@@ -406,7 +406,7 @@ export default function DashboardTab({ onNavigate }: Props) {
         </div>
       </div>
       <div style={{ textAlign: 'center', padding: '12px 0', fontSize: '12px', color: '#bbb' }}>
-        DomiTemps · Gestion de temps pour assistantes a domicile
+        DomiTemps · Gestion de temps pour assistant(e)s à domicile
         {user?.role === 'admin' && <span> · <a href="/admin" style={{ color: '#bbb', textDecoration: 'none' }}>admin</a></span>}
       </div>
     </div>
