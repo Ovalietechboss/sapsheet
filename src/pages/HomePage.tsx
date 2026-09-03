@@ -182,6 +182,33 @@ export default function HomePage() {
             </button>
           ))}
         </nav>
+
+        {/* Acces a la console d'administration.
+            Il n'existait qu'un lien gris clair en bas de l'accueil, quasi
+            introuvable et minuscule au doigt — or c'est le seul chemin sur
+            l'app native, qui n'a pas de barre d'adresse pour taper /admin.
+            Masque pendant une impersonation, puisque `user` est alors la cible :
+            on en sort par « Revenir admin » dans la banniere orange. */}
+        {user?.role === 'admin' && (
+          <button
+            onClick={() => { window.location.href = '/admin'; }}
+            style={{
+              width: '100%',
+              padding: '12px',
+              marginBottom: '8px',
+              backgroundColor: 'transparent',
+              color: '#666',
+              border: '1px solid #ddd',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              textAlign: 'left',
+              fontSize: '14px',
+            }}
+          >
+            🛠️ Administration
+          </button>
+        )}
+
         <button
           onClick={logout}
           style={{

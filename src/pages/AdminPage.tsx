@@ -280,9 +280,16 @@ export default function AdminPage() {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{ display: 'flex', height: '100dvh', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       {/* Sidebar */}
-      <div style={{ width: '220px', backgroundColor: '#1a1a2e', color: 'white', padding: '24px 16px', display: 'flex', flexDirection: 'column' }}>
+      {/* Zones sures : sur mobile l'app dessine sous la barre d'etat, qui
+          recouvrait le titre et le badge ADMIN (constate sur Pixel 9a le
+          2026-09-03, une fois cette page rendue atteignable depuis le menu). */}
+      <div style={{ width: '220px', backgroundColor: '#1a1a2e', color: 'white', padding: '24px 16px',
+        paddingTop: 'calc(24px + env(safe-area-inset-top))',
+        paddingBottom: 'calc(24px + env(safe-area-inset-bottom))',
+        paddingLeft: 'calc(16px + env(safe-area-inset-left))',
+        display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
         <div style={{ marginBottom: '32px' }}>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>DomiTemps</h2>
           <span style={{ display: 'inline-block', background: '#ff3b30', color: 'white', padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold', marginTop: '6px', letterSpacing: '0.5px' }}>ADMIN</span>
@@ -320,7 +327,10 @@ export default function AdminPage() {
       </div>
 
       {/* Contenu principal */}
-      <div style={{ flex: 1, padding: '32px 40px', overflowY: 'auto', backgroundColor: '#f5f6fa' }}>
+      <div style={{ flex: 1, padding: '32px 40px', overflowY: 'auto', backgroundColor: '#f5f6fa',
+        paddingTop: 'calc(32px + env(safe-area-inset-top))',
+        paddingBottom: 'calc(32px + env(safe-area-inset-bottom))',
+        paddingRight: 'calc(40px + env(safe-area-inset-right))' }}>
         {loading ? (
           <div style={{ textAlign: 'center', color: '#888', marginTop: '80px' }}>Chargement...</div>
         ) : (
