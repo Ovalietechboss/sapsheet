@@ -806,7 +806,11 @@ export default function BilansTab() {
       )}
 
       {/* Résumé global — 5 cartes */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px', marginBottom: '20px' }}>
+      {/* auto-fit plutot que repeat(5, 1fr) : a 5 colonnes fixes, chaque carte
+          tombait sous 70px sur un telephone et la derniere debordait a droite,
+          hors de l'ecran. Avec minmax(110px), on obtient 3+2 sur mobile et les
+          5 d'un trait des que la largeur le permet. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '10px', marginBottom: '20px' }}>
         <StatCard label="Heures" value={`${totalHours.toFixed(1)}h`} bg="#EBF9F0" color="#2d8a4e" />
         <StatCard label="Clients actifs" value={String(totalClientsActive)} bg="#E8F4FF" color="#1a6fb5" />
         <StatCard label="Salaire" value={`${totalEarnings.toFixed(0)}€`} bg="#F0EBFF" color="#5b3db5" />
@@ -823,7 +827,11 @@ export default function BilansTab() {
       )}
 
       {/* Sous-navigation : Documents | Chronologie | CSV */}
-      <div style={{ display: 'flex', gap: '0', marginBottom: '20px', borderBottom: '2px solid #eee' }}>
+      {/* Cette barre ne porte pas que les onglets : URSSAF, NOVA et Export CSV
+          s'y trouvent aussi. Sans flexWrap, les trois boutons sortaient de
+          l'ecran a droite sur mobile — donc inatteignables (constate sur
+          Pixel 9a le 2026-09-03). Ils passent desormais a la ligne. */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', rowGap: '8px', gap: '0', marginBottom: '20px', borderBottom: '2px solid #eee' }}>
         {([
           { id: 'documents' as SubView, label: `Documents (${totalClientsActive})` },
           { id: 'chronologie' as SubView, label: `Chronologie (${monthTimesheets.length})` },
@@ -831,14 +839,21 @@ export default function BilansTab() {
         ]).map((tab) => (
           <button key={tab.id} onClick={() => setSubView(tab.id)}
             style={{
-              padding: '10px 20px', border: 'none', borderBottom: subView === tab.id ? '3px solid #007AFF' : '3px solid transparent',
+              // Padding et corps reduits sur mobile : a 20px/14px les trois onglets
+              // depassaient les 371px disponibles et « Synthese » tombait seul sur
+              // une deuxieme ligne (mesure sur Pixel 9a, 411px CSS).
+              padding: isMobile ? '10px 8px' : '10px 20px', border: 'none', borderBottom: subView === tab.id ? '3px solid #007AFF' : '3px solid transparent',
               backgroundColor: 'transparent', color: subView === tab.id ? '#007AFF' : '#888',
-              fontWeight: subView === tab.id ? 'bold' : 'normal', fontSize: '14px', cursor: 'pointer', marginBottom: '-2px',
+              fontWeight: subView === tab.id ? 'bold' : 'normal', fontSize: isMobile ? '13px' : '14px', cursor: 'pointer', marginBottom: '-2px',
             }}>
             {tab.label}
           </button>
         ))}
-        <div style={{ flex: 1 }} />
+        {/* Sur mobile, cet element force le retour a la ligne (flexBasis 100%)
+            pour que les boutons d'action forment leur propre rangee au lieu de
+            s'intercaler entre les onglets. Sur grand ecran il reste un simple
+            ressort qui les repousse a droite. */}
+        <div style={isMobile ? { flexBasis: '100%', height: 0 } : { flex: 1 }} />
         <button onClick={() => setShowUrssaf(true)}
           style={{ padding: '8px 16px', backgroundColor: '#00897B', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', alignSelf: 'center', marginBottom: '4px', marginRight: '8px' }}>
           URSSAF
@@ -1079,8 +1094,12 @@ export default function BilansTab() {
               Aucun pointage pour {MONTHS[selectedMonth - 1]} {selectedYear}
             </div>
           ) : (
-            <div style={{ background: 'white', borderRadius: '12px', overflow: 'hidden', border: '1px solid #eee' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <div style={{ background: 'white', borderRadius: '12px', overflowX: 'auto', border: '1px solid #eee' }}>
+              {/* overflowX auto, et non overflow hidden : les 7 colonnes ne tiennent
+                  pas dans un telephone, et 'hidden' les rognait purement et
+                  simplement — Frais et Total etaient invisibles, sans moyen de les
+                  atteindre. minWidth force le defilement plutot que l'ecrasement. */}
+              <table style={{ width: '100%', minWidth: '560px', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f5f5f5' }}>
                     <th style={{ padding: '12px 14px', textAlign: 'left', fontWeight: '600', color: '#666', borderBottom: '2px solid #ddd' }}>Client</th>

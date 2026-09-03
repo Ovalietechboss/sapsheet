@@ -141,7 +141,12 @@ export default function HomePage() {
           backgroundColor: '#f5f5f5',
           borderRight: '1px solid #ddd',
           padding: '20px',
-          paddingTop: 'calc(20px + env(safe-area-inset-top))',
+          // Le bouton menu est en position fixe AU-DESSUS du panneau (zIndex
+          // 10000) et s'etend jusqu'a 52px : sans ce degagement il recouvrait
+          // le titre « DomiTemps » du panneau une fois celui-ci ouvert.
+          paddingTop: isMobile
+            ? 'calc(64px + env(safe-area-inset-top))'
+            : 'calc(20px + env(safe-area-inset-top))',
           paddingBottom: 'calc(20px + env(safe-area-inset-bottom))',
           display: 'flex',
           flexDirection: 'column',
