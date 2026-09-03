@@ -7,7 +7,14 @@
 //   INVOICE_BCC_EMAIL   = adresse recevant une copie (BCC) de chaque envoi — archive. Optionnel.
 //
 // Le client appelle : supabase.functions.invoke('send-invoice', { body: {...} })
-// Body attendu : { to, cc?, bcc?, subject, message, pdfBase64, filename }
+// Body attendu : { to, cc?, bcc?, subject, message, pdfBase64, filename, replyTo? }
+//
+// `replyTo` = adresse du professionnel qui envoie. SANS elle, les reponses des
+// mandataires partent vers l'adresse d'expedition du domaine — qui n'a pas
+// forcement d'alias, auquel cas elles disparaissent sans que personne ne le
+// sache (constate le 2026-09-03 : aucun alias `facture` cote ImprovMX). Avec
+// elle, la reponse arrive directement chez la bonne personne, ce qui est la
+// seule logique tenable des qu'il y a plusieurs utilisateurs.
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const FROM = Deno.env.get('INVOICE_FROM_EMAIL') || 'DomiTemps <onboarding@resend.dev>';
@@ -27,7 +34,7 @@ Deno.serve(async (req) => {
     if (!RESEND_API_KEY) {
       return json({ error: 'RESEND_API_KEY non configurée (Edge Functions → Secrets).' }, 500);
     }
-    const { to, cc, bcc, subject, message, pdfBase64, filename } = await req.json();
+    const { to, cc, bcc, subject, message, pdfBase64, filename, replyTo } = await req.json();
     if (!to || !pdfBase64) {
       return json({ error: 'Champs requis manquants (to, pdfBase64).' }, 400);
     }
@@ -49,6 +56,7 @@ Deno.serve(async (req) => {
         to: [to],
         cc: Array.isArray(cc) && cc.length ? cc : undefined,
         bcc: bccList.length ? bccList : undefined,
+        reply_to: replyTo || undefined,
         subject: subject || 'Votre facture',
         html: (message || 'Veuillez trouver votre facture en pièce jointe.').replace(/\n/g, '<br/>'),
         attachments: [{ filename: filename || 'facture.pdf', content: pdfBase64 }],

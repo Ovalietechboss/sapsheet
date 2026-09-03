@@ -268,7 +268,9 @@ export default function InvoicesTab() {
       const signature = [user?.first_name, user?.display_name].filter(Boolean).join(' ') || user?.business_name || '';
       const message = `Bonjour,\n\nVeuillez trouver ${isCredit ? "l'avoir" : 'la facture'} ${invoice.invoice_number} en pièce jointe.\n\nCordialement,\n${signature}`;
       const { data, error } = await supabase.functions.invoke('send-invoice', {
-        body: { to, cc, subject, message, pdfBase64, filename: `${invoice.invoice_number}.pdf` },
+        // replyTo : les reponses du destinataire doivent revenir au professionnel
+        // qui envoie, pas a l'adresse d'expedition du domaine.
+        body: { to, cc, subject, message, pdfBase64, filename: `${invoice.invoice_number}.pdf`, replyTo: user?.email },
       });
       if (error || (data && data.error)) {
         throw new Error(error?.message || data?.error || 'Échec de l\'envoi');

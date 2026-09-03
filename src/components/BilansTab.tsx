@@ -372,7 +372,9 @@ export default function BilansTab() {
         `Je reste à votre disposition pour tout complément.\n\nCordialement,\n${signature}`;
 
       const { data, error } = await supabase.functions.invoke('send-invoice', {
-        body: { to, cc, subject, message, pdfBase64, filename: `${doc.invoiceNumber}.pdf` },
+        // replyTo : les reponses du mandataire doivent revenir au professionnel
+        // qui envoie, pas a l'adresse d'expedition du domaine.
+        body: { to, cc, subject, message, pdfBase64, filename: `${doc.invoiceNumber}.pdf`, replyTo: user.email },
       });
       if (error || (data && data.error)) {
         throw new Error(error?.message || data?.error || "Échec de l'envoi");
