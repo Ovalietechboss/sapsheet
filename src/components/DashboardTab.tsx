@@ -398,10 +398,18 @@ export default function DashboardTab({ onNavigate }: Props) {
       {/* Aide + Footer */}
       <div style={{ background: 'white', border: '1px solid #eee', borderRadius: '12px', padding: '18px', textAlign: 'center', marginBottom: '16px' }}>
         <p style={{ fontWeight: '600', fontSize: '14px', color: '#333', marginBottom: '10px' }}>Besoin d'aide ?</p>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {/* Pas de target="_blank" : dans la WebView Capacitor, une nouvelle
+              fenetre ne se referme pas et l'utilisateur reste coince.
+              ATTENTION : le bouton retour d'Android ne ramene PAS a l'app, il la
+              QUITTE (verifie sur Pixel 9a le 2026-09-03). D'ou le lien
+              « Retour a l'application » place en tete de chaque page publique —
+              c'est le seul chemin de retour fiable. */}
+          <a href="/aide.html"
+            style={{ padding: '8px 18px', backgroundColor: '#5b3db5', color: 'white', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', fontSize: '13px' }}>Guide</a>
           <a href="https://wa.me/33676672672?text=Bonjour%2C%20j'ai%20une%20question%20sur%20DomiTemps" target="_blank" rel="noopener noreferrer"
             style={{ padding: '8px 18px', backgroundColor: '#25D366', color: 'white', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', fontSize: '13px' }}>WhatsApp</a>
-          <a href="mailto:poumpoum6565@gmail.com?subject=DomiTemps%20-%20Aide&body=Bonjour%2C%0A%0A"
+          <a href="mailto:contact@bigorre-aide.fr?subject=DomiTemps%20-%20Aide&body=Bonjour%2C%0A%0A"
             style={{ padding: '8px 18px', backgroundColor: '#007AFF', color: 'white', borderRadius: '8px', textDecoration: 'none', fontWeight: 'bold', fontSize: '13px' }}>Email</a>
         </div>
       </div>

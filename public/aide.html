@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<!-- viewport-fit=cover EST necessaire : la WebView Capacitor est en
+     edge-to-edge au niveau d'Android (targetSdk 36), la page passe donc
+     sous la barre d'etat quoi qu'il arrive. Sans cover, env() vaut 0 et
+     on ne PEUT PAS reserver la marge — le texte finit sous l'heure. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DomiTemps — Guide de démarrage</title>
+<style>
+  :root { color-scheme: light; }
+  body {
+    margin: 0;
+    padding: calc(32px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right))
+             calc(64px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #1a1a2e; background: #fff;
+  }
+  main { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 27px; margin: 0 0 4px; }
+  h2 {
+    font-size: 19px; margin: 38px 0 10px; padding-top: 16px;
+    border-top: 1px solid #eee;
+  }
+  h3 { font-size: 16px; margin: 24px 0 6px; }
+  .maj { color: #666; font-size: 14px; margin: 0 0 24px; }
+  .sommaire {
+    background: #F0F7FF; border: 1px solid #cfe4ff; border-radius: 10px;
+    padding: 16px 20px; margin: 24px 0;
+  }
+  .sommaire ol { margin: 8px 0 0; padding-left: 22px; }
+  .sommaire li { margin: 5px 0; }
+  .sommaire a { color: #007AFF; text-decoration: none; }
+  .sommaire a:hover { text-decoration: underline; }
+  ol.etapes { padding-left: 22px; }
+  ol.etapes li { margin: 9px 0; }
+  .note {
+    background: #FFF8E7; border-left: 4px solid #FF9500;
+    padding: 12px 16px; margin: 18px 0; font-size: 15px;
+  }
+  .note p { margin: 0; }
+  .note + .note { margin-top: 12px; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14.5px; }
+  th, td { border: 1px solid #e3e3e8; padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #f7f7fa; font-weight: 600; }
+  kbd {
+    background: #f2f2f5; border: 1px solid #ddd; border-bottom-width: 2px;
+    border-radius: 5px; padding: 1px 7px; font-size: 14px; font-family: inherit;
+    white-space: nowrap;
+  }
+  .badge { font-size: 15px; }
+  footer {
+    margin-top: 48px; padding-top: 16px; border-top: 1px solid #eee;
+    color: #888; font-size: 14px;
+  }
+  a { color: #007AFF; }
+  .retour {
+    display: inline-block; margin-bottom: 20px; padding: 8px 16px;
+    background: #f2f2f5; border-radius: 8px; color: #007AFF;
+    text-decoration: none; font-size: 14px; font-weight: 600;
+  }
+</style>
+</head>
+<body>
+<main>
+
+<a class="retour" href="/">&larr; Retour à l'application</a>
+
+<h1>DomiTemps — guide de démarrage</h1>
+<p class="maj">Tout ce qu'il faut savoir pour vos premières semaines.</p>
+
+<div class="sommaire">
+  <strong>Au sommaire</strong>
+  <ol>
+    <li><a href="#installer">Installer l'application</a></li>
+    <li><a href="#premier-acces">Votre premier accès</a></li>
+    <li><a href="#clients">Enregistrer vos clients</a></li>
+    <li><a href="#pointages">Saisir vos pointages</a></li>
+    <li><a href="#documents">Produire et transmettre vos documents</a></li>
+    <li><a href="#bilans">Relire un mois</a></li>
+    <li><a href="#questions">Questions fréquentes</a></li>
+  </ol>
+</div>
+
+
+<h2 id="installer">1. Installer l'application</h2>
+
+<h3>Sur Android</h3>
+<p>
+  Ouvrez sur votre téléphone le lien d'invitation qui vous a été transmis, acceptez de
+  devenir testeur, puis installez depuis le Play Store.
+</p>
+<div class="note">
+  <p>
+    Si le Play Store affiche <strong>« Application non disponible »</strong>, c'est presque
+    toujours que vous n'avez pas encore accepté l'invitation, ou que votre téléphone est
+    connecté à un autre compte Google que celui inscrit sur la liste. Ouvrez à nouveau le
+    lien depuis le bon compte.
+  </p>
+</div>
+
+<h3>Sur iPhone</h3>
+<p>
+  Ouvrez le site dans <strong>Safari</strong>, appuyez sur le bouton <strong>Partager</strong>
+  (le carré avec une flèche vers le haut), puis sur <strong>« Sur l'écran d'accueil »</strong>.
+  L'application s'installe comme une application normale, avec sa propre icône.
+</p>
+<div class="note">
+  <p>
+    Il faut vraiment passer par Safari : depuis Chrome ou un autre navigateur, l'option
+    « Sur l'écran d'accueil » n'apparaît pas.
+  </p>
+</div>
+
+<h3>Sur ordinateur</h3>
+<p>Rien à installer, l'application fonctionne directement dans le navigateur.</p>
+
+
+<h2 id="premier-acces">2. Votre premier accès</h2>
+
+<p>Quand votre compte est créé, vous recevez <strong>deux emails</strong> :</p>
+
+<table>
+  <tr><th>Email</th><th>À quoi il sert</th></tr>
+  <tr>
+    <td>« Confirmez votre adresse email »</td>
+    <td>Vérifie que l'adresse vous appartient. Cliquez sur le bouton.</td>
+  </tr>
+  <tr>
+    <td>« Définissez votre mot de passe »</td>
+    <td><strong>C'est celui-ci qui vous fait entrer</strong> dans l'application.</td>
+  </tr>
+</table>
+
+<div class="note">
+  <p>
+    Beaucoup de personnes s'arrêtent au premier et se demandent pourquoi elles n'ont pas de
+    mot de passe. Suivez bien le <strong>second</strong>.
+  </p>
+</div>
+
+<p>
+  Ce lien a une durée de validité limitée et ne fonctionne qu'une fois. S'il ne marche plus,
+  demandez-en un nouveau depuis l'écran de connexion, lien <strong>« Mot de passe oublié »</strong>.
+</p>
+
+<h3>Renseigner votre profil</h3>
+<p>
+  Avant votre première facture, passez par l'onglet <strong>Profil</strong> et complétez vos
+  informations : nom, adresse, téléphone, et selon votre situation numéro CESU, SIREN, SIRET,
+  IBAN. Ces éléments sont des <strong>mentions obligatoires</strong> sur les documents que vous
+  émettrez — s'ils manquent, vos relevés et factures partiront incomplets.
+</p>
+
+
+<h2 id="clients">3. Enregistrer vos clients</h2>
+
+<p>
+  Onglet <strong>Clients</strong>. Pour chaque personne chez qui vous intervenez, une fiche.
+  Le choix qui compte le plus est le <strong>mode de facturation</strong>, car il détermine
+  quel document sera produit :
+</p>
+
+<table>
+  <tr><th>Mode</th><th>Document produit</th><th>Pour qui</th></tr>
+  <tr>
+    <td><strong>CESU</strong></td>
+    <td>un relevé de pointage</td>
+    <td>Particulier employeur qui vous déclare au CESU</td>
+  </tr>
+  <tr>
+    <td><strong>Classique</strong></td>
+    <td>une facture</td>
+    <td>Particulier que vous facturez directement</td>
+  </tr>
+</table>
+
+<h3>Le mandataire</h3>
+<p>
+  Si le dossier est suivi par une association ou un organisme, renseignez-le en
+  <strong>Mandataire</strong> sur la fiche du client. C'est à lui que partira le relevé pour
+  validation, et non au client lui-même.
+</p>
+
+<h3>Les destinataires supplémentaires</h3>
+<p>
+  Un enfant, un tuteur, un proche qui doit recevoir une copie ? Ajoutez-le en
+  <strong>Destinataire supplémentaire</strong>. Il sera mis en copie de chaque envoi concernant
+  ce client, automatiquement.
+</p>
+
+
+<h2 id="pointages">4. Saisir vos pointages</h2>
+
+<p>
+  Onglet <strong>Pointages</strong>, ou le bouton <strong>Nouveau pointage</strong> de l'accueil.
+  Choisissez le client et la date, puis le mode de saisie : <strong>Horaires</strong>, si vous
+  notez une heure d'arrivée et de départ, ou <strong>Durée</strong>, si vous préférez indiquer
+  directement un nombre d'heures. Le bouton bascule de l'un à l'autre.
+</p>
+
+<p>
+  Le même écran accueille les <strong>frais</strong> : kilomètres parcourus, montants avancés,
+  et une zone de notes. Tout cela se retrouvera sur le document du mois, alors autant le saisir
+  sur le moment.
+</p>
+
+<div class="note">
+  <p>
+    <strong>Le plus important est la régularité.</strong> Un pointage saisi le jour même est
+    juste ; reconstitué trois semaines plus tard, il est approximatif. C'est là que se joue la
+    fiabilité de tout le reste.
+  </p>
+</div>
+
+
+<h2 id="documents">5. Produire et transmettre vos documents</h2>
+
+<p>
+  Onglet <strong>Bilans</strong>. Choisissez le mois, puis l'onglet <strong>Documents</strong> :
+  vos clients y sont regroupés par mandataire, avec pour chacun le nombre d'heures et le montant
+  du mois.
+</p>
+
+<ol class="etapes">
+  <li><strong>Générer</strong> — le bouton vert produit le relevé CESU ou la facture, selon le
+      mode du client.</li>
+  <li><strong>Envoyer</strong> — le bouton violet l'expédie par email au mandataire ; à défaut
+      au client ; à défaut au premier destinataire supplémentaire. Les autres destinataires
+      sont mis en copie.</li>
+  <li><strong>Ou marquer remis</strong> — si vous l'avez donné de la main à la main, utilisez
+      <strong>« Marquer comme remis en main propre »</strong>. Le suivi reflète alors la
+      réalité, au lieu de laisser le document éternellement « généré ».</li>
+</ol>
+
+<h3>Lire les pastilles de suivi</h3>
+<table>
+  <tr><th>Pastille</th><th>Ce qu'elle dit</th></tr>
+  <tr><td class="badge">○</td><td>Rien n'a encore été produit</td></tr>
+  <tr><td class="badge">📄</td><td>Document généré, pas encore transmis</td></tr>
+  <tr><td class="badge">✉️</td><td>Envoyé par email</td></tr>
+  <tr><td class="badge">🤝</td><td>Remis en main propre</td></tr>
+  <tr><td class="badge">⚠️</td><td>L'envoi a échoué — à refaire</td></tr>
+</table>
+
+<h3>Les factures classiques</h3>
+<p>
+  Elles vivent dans l'onglet <strong>Factures</strong>, où vous suivez les impayés, marquez une
+  facture <strong>Payée</strong>, ou créez un <strong>Avoir</strong> si une correction s'impose.
+</p>
+
+
+<h2 id="bilans">6. Relire un mois</h2>
+
+<p>L'onglet Bilans propose trois vues du même mois :</p>
+
+<table>
+  <tr><th>Vue</th><th>Ce qu'on y voit</th></tr>
+  <tr><td><strong>Documents</strong></td><td>Où en est chaque client : généré, envoyé, remis</td></tr>
+  <tr><td><strong>Chronologie</strong></td><td>Tous les pointages du mois, dans l'ordre</td></tr>
+  <tr><td><strong>Synthèse</strong></td><td>Un tableau récapitulatif : heures, salaire, frais, total</td></tr>
+</table>
+
+<p>
+  Les boutons <strong>URSSAF</strong>, <strong>NOVA</strong> et <strong>Export CSV</strong>
+  produisent les récapitulatifs à reporter dans vos déclarations.
+</p>
+
+<div class="note">
+  <p>
+    Avant de clore un mois, l'écran signale les <strong>points d'attention</strong> : clients
+    sans document généré, pointages non validés. Un coup d'œil qui évite de découvrir un oubli
+    le mois suivant.
+  </p>
+</div>
+
+
+<h2 id="questions">7. Questions fréquentes</h2>
+
+<h3>Je ne vois aucune donnée, mon écran est vide</h3>
+<p>
+  C'est normal sur un compte neuf. Chaque personne ne voit que ses propres clients et
+  pointages ; ceux des autres utilisateurs vous sont invisibles. Commencez par créer un client.
+</p>
+
+<h3>J'ai oublié mon mot de passe</h3>
+<p>
+  Sur l'écran de connexion, lien <strong>« Mot de passe oublié »</strong>. Vous recevrez un
+  email pour en choisir un nouveau. Pensez à regarder dans vos indésirables.
+</p>
+
+<h3>Le mandataire ne reçoit pas mes relevés</h3>
+<p>
+  Vérifiez l'adresse email sur sa fiche, dans l'onglet Clients. Si la pastille affiche
+  <span class="badge">⚠️</span>, l'envoi a échoué et il faut le relancer.
+</p>
+
+<h3>Est-ce que je garde une trace de ce que j'envoie ?</h3>
+<p>
+  Oui. Chaque relevé ou facture envoyé depuis l'application vous est adressé en copie cachée,
+  dans votre propre boîte. Vous seul la recevez.
+</p>
+
+<h3>Puis-je répondre à un email envoyé depuis l'application ?</h3>
+<p>
+  Oui. Quand un mandataire répond à un relevé que vous avez envoyé, sa réponse arrive
+  <strong>directement dans votre boîte</strong>, pas ailleurs.
+</p>
+
+<h3>Mes données sont-elles visibles par les autres utilisateurs ?</h3>
+<p>
+  Non. Le cloisonnement est appliqué par la base de données elle-même, et pas seulement par
+  l'application : un utilisateur ne peut pas lire les données d'un autre. Seul un administrateur
+  peut consulter un compte, à des fins d'assistance. Voir la
+  <a href="/confidentialite.html">politique de confidentialité</a>.
+</p>
+
+<h3>Je veux supprimer mon compte</h3>
+<p>
+  La marche à suivre est décrite sur la page
+  <a href="/suppression-compte.html">suppression de compte</a>.
+</p>
+
+
+<h2>Une question qui n'est pas ici ?</h2>
+<p>
+  Écrivez à <a href="mailto:contact@bigorre-aide.fr">contact@bigorre-aide.fr</a>, ou utilisez
+  le bouton WhatsApp depuis l'accueil de l'application.
+</p>
+
+<footer>
+  DomiTemps — au service de celles et ceux qui prennent soin des autres.<br>
+  <a href="/confidentialite.html">Politique de confidentialité</a> ·
+  <a href="/suppression-compte.html">Supprimer son compte</a>
+</footer>
+
+</main>
+</body>
+</html>

@@ -4,7 +4,14 @@
 // Secrets à définir (Edge Functions → Secrets) :
 //   RESEND_API_KEY      = re_xxx
 //   INVOICE_FROM_EMAIL  = "Bigorre Aide <facture@bigorre-aide.fr>"
-//   INVOICE_BCC_EMAIL   = adresse recevant une copie (BCC) de chaque envoi — archive. Optionnel.
+//
+// ⚠️ INVOICE_BCC_EMAIL N'EST PLUS UTILISE — le secret peut etre supprime.
+//    C'etait une adresse UNIQUE, appliquee en copie cachee a chaque envoi de
+//    CHAQUE utilisateur. Tant qu'il n'y en avait qu'une, elle archivait ses
+//    propres documents. Des le deuxieme, les releves de ses clients a lui
+//    seraient tombes dans la boite de quelqu'un d'autre — avec le PDF, donc le
+//    nom, les heures et les montants de personnes accompagnees a domicile.
+//    La copie d'archive part desormais chez l'expediteur lui-meme.
 //
 // Le client appelle : supabase.functions.invoke('send-invoice', { body: {...} })
 // Body attendu : { to, cc?, bcc?, subject, message, pdfBase64, filename, replyTo? }
@@ -18,8 +25,6 @@
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const FROM = Deno.env.get('INVOICE_FROM_EMAIL') || 'DomiTemps <onboarding@resend.dev>';
-// Copie cachée systématique (archive de tous les envois). Vide = pas de copie.
-const BCC = Deno.env.get('INVOICE_BCC_EMAIL');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,11 +44,13 @@ Deno.serve(async (req) => {
       return json({ error: 'Champs requis manquants (to, pdfBase64).' }, 400);
     }
 
-    // BCC = copie d'archive du secret + éventuel bcc passé dans le body, dédupliqués.
+    // Copie d'archive : l'EXPEDITEUR lui-meme (`replyTo` porte son adresse), plus
+    // un eventuel bcc passe dans le body. Chacun archive ses propres envois et
+    // rien que les siens.
     const bccList = [...new Set([
-      ...(BCC ? [BCC] : []),
+      ...(replyTo ? [replyTo] : []),
       ...(Array.isArray(bcc) ? bcc : bcc ? [bcc] : []),
-    ])];
+    ])].filter((a) => a !== to);
 
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',

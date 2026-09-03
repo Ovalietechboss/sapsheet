@@ -2,12 +2,18 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- viewport-fit=cover EST necessaire : la WebView Capacitor est en
+     edge-to-edge au niveau d'Android (targetSdk 36), la page passe donc
+     sous la barre d'etat quoi qu'il arrive. Sans cover, env() vaut 0 et
+     on ne PEUT PAS reserver la marge — le texte finit sous l'heure. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>DomiTemps — Supprimer son compte et ses données</title>
 <style>
   :root { color-scheme: light; }
   body {
-    margin: 0; padding: 32px 20px 64px;
+    margin: 0;
+    padding: calc(32px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right))
+             calc(64px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
     font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     color: #1a1a2e; background: #fff;
   }
@@ -28,10 +34,17 @@
   .todo { background: #fff4e5; border-left: 4px solid #FF9500; padding: 12px 16px; margin: 18px 0; }
   footer { margin-top: 44px; padding-top: 16px; border-top: 1px solid #eee; color: #888; font-size: 14px; }
   a { color: #007AFF; }
+  .retour {
+    display: inline-block; margin-bottom: 20px; padding: 8px 16px;
+    background: #f2f2f5; border-radius: 8px; color: #007AFF;
+    text-decoration: none; font-size: 14px; font-weight: 600;
+  }
 </style>
 </head>
 <body>
 <main>
+
+<a class="retour" href="/">&larr; Retour à l'application</a>
 
 <h1>Supprimer son compte DomiTemps et ses données</h1>
 <p class="maj">Dernière mise à jour : 31 août 2026 — Application <code>com.domitemps.app</code></p>
