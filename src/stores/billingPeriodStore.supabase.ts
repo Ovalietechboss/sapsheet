@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
-import { useAuthStore } from './authStore';
+import { useAuthStore, getEffectiveUserId } from './authStore';
 
 export type PeriodStatus = 'open' | 'locked' | 'archived';
 export type ClientDocStatus = 'pending' | 'generated' | 'sent' | 'error';
@@ -73,11 +73,36 @@ export const useBillingPeriodStore = create<BillingPeriodStore>((set, get) => ({
   hydratePeriods: async () => {
     set({ isLoading: true });
     try {
-      const [{ data: periods }, { data: clients }] = await Promise.all([
-        supabase.from('billing_periods').select('*').order('year', { ascending: false }).order('month', { ascending: false }),
-        supabase.from('billing_period_clients').select('*'),
-      ]);
-      set({ periods: periods || [], periodClients: clients || [], isLoading: false });
+      const uid = getEffectiveUserId();
+      if (!uid) {
+        set({ periods: [], periodClients: [], isLoading: false });
+        return;
+      }
+
+      // La RLS ouvre tout aux admins (`OR is_admin()`) : sans ce filtre, cet
+      // écran fondrait les données de tous les utilisateurs. On borne au
+      // périmètre de l'utilisateur effectif — soi-même, ou la cible en cours
+      // d'impersonation.
+      const { data: periodsData } = await supabase
+        .from('billing_periods')
+        .select('*')
+        .eq('user_id', uid)
+        .order('year', { ascending: false })
+        .order('month', { ascending: false });
+
+      // `billing_period_clients` ne porte pas de user_id : son appartenance
+      // passe par la période parente, d'où la séquence.
+      const periods = periodsData || [];
+      let periodClients: BillingPeriodClient[] = [];
+      if (periods.length > 0) {
+        const { data } = await supabase
+          .from('billing_period_clients')
+          .select('*')
+          .in('period_id', periods.map((p) => p.id));
+        periodClients = data || [];
+      }
+
+      set({ periods, periodClients, isLoading: false });
     } catch (err) {
       console.error('hydratePeriods failed', err);
       set({ isLoading: false });

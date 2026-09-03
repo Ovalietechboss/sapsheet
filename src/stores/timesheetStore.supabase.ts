@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
-import { useAuthStore } from './authStore';
+import { useAuthStore, getEffectiveUserId } from './authStore';
 import { cancelTodayReminder } from '../utils/notificationService';
 
 export interface Timesheet {
@@ -44,9 +44,20 @@ export const useTimesheetStore = create<TimesheetStore>((set, get) => ({
   hydrateTimesheets: async () => {
     set({ isLoading: true });
     try {
+      const uid = getEffectiveUserId();
+      if (!uid) {
+        set({ timesheets: [], isLoading: false });
+        return;
+      }
+
+      // La RLS ouvre tout aux admins (`OR is_admin()`) : sans ce filtre, cet
+      // écran fondrait les données de tous les utilisateurs. On borne au
+      // périmètre de l'utilisateur effectif — soi-même, ou la cible en cours
+      // d'impersonation.
       const { data, error } = await supabase
         .from('timesheets')
         .select('*')
+        .eq('user_id', uid)
         .order('date_arrival', { ascending: false });
 
       if (error) throw error;

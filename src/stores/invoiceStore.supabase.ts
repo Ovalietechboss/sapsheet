@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
-import { useAuthStore } from './authStore';
+import { useAuthStore, getEffectiveUserId } from './authStore';
 
 /** Ligne d'une facture indépendante (société B2B, sans pointage). */
 export interface InvoiceLine {
@@ -57,9 +57,20 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
   hydrateInvoices: async () => {
     set({ isLoading: true });
     try {
+      const uid = getEffectiveUserId();
+      if (!uid) {
+        set({ invoices: [], isLoading: false });
+        return;
+      }
+
+      // La RLS ouvre tout aux admins (`OR is_admin()`) : sans ce filtre, cet
+      // écran fondrait les données de tous les utilisateurs. On borne au
+      // périmètre de l'utilisateur effectif — soi-même, ou la cible en cours
+      // d'impersonation.
       const { data, error } = await supabase
         .from('invoices')
         .select('*')
+        .eq('user_id', uid)
         .order('generated_at', { ascending: false });
 
       if (error) throw error;

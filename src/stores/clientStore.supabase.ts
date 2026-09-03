@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
-import { useAuthStore } from './authStore';
+import { useAuthStore, getEffectiveUserId } from './authStore';
 
 export interface Client {
   id: string;
@@ -59,14 +59,39 @@ export const useClientStore = create<ClientStore>((set, get) => ({
   hydrateClients: async () => {
     set({ isLoading: true });
     try {
-      const [{ data: clientsData, error: clientsError }, { data: contactsData }] = await Promise.all([
-        supabase.from('clients').select('*').order('created_at', { ascending: false }),
-        supabase.from('client_contacts').select('*').order('label', { ascending: true }),
-      ]);
+      const uid = getEffectiveUserId();
+      if (!uid) {
+        set({ clients: [], contacts: [], isLoading: false });
+        return;
+      }
+
+      // La RLS ouvre tout aux admins (`OR is_admin()`) : sans ce filtre, cet
+      // écran fondrait les données de tous les utilisateurs. On borne au
+      // périmètre de l'utilisateur effectif — soi-même, ou la cible en cours
+      // d'impersonation.
+      const { data: clientsData, error: clientsError } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false });
 
       if (clientsError) throw clientsError;
 
-      set({ clients: clientsData || [], contacts: contactsData || [], isLoading: false });
+      // `client_contacts` ne porte pas de user_id : son appartenance passe par
+      // le client parent. D'où la séquence, là où les deux requêtes partaient
+      // auparavant en parallèle.
+      const clients = clientsData || [];
+      let contactsData: ClientContact[] = [];
+      if (clients.length > 0) {
+        const { data } = await supabase
+          .from('client_contacts')
+          .select('*')
+          .in('client_id', clients.map((c) => c.id))
+          .order('label', { ascending: true });
+        contactsData = data || [];
+      }
+
+      set({ clients, contacts: contactsData, isLoading: false });
     } catch (error) {
       console.error('hydrateClients failed', error);
       set({ isLoading: false });

@@ -47,6 +47,30 @@ interface AuthState {
   realAdmin: User | null;    // l'admin original stocké pendant l'impersonation
 }
 
+// L'impersonation doit survivre au rechargement complet de page que déclenche
+// AdminPage juste après l'avoir activée. Le store est en mémoire seule (pas de
+// middleware `persist`) : sans ça la cible était perdue avant même d'être
+// affichée, et l'admin retombait sur sa propre session sans s'en apercevoir.
+//
+// sessionStorage et NON localStorage, à dessein : l'usurpation s'arrête à la
+// fermeture de l'onglet et ne peut pas se prolonger silencieusement.
+const CLE_IMPERSONATION = 'domitemps.impersonation';
+
+/**
+ * L'utilisateur dont les données doivent être affichées.
+ *
+ * `user` EST l'utilisateur effectif : l'impersonation y substitue la cible.
+ * Filtrer les requêtes là-dessus donne donc le bon périmètre dans les deux cas.
+ *
+ * La RLS reste la vraie frontière de sécurité, mais elle ouvre tout aux admins
+ * (`OR is_admin()`) : sans ce filtre applicatif, les écrans d'un admin fondent
+ * les données de TOUS les utilisateurs, y compris celles des personnes
+ * accompagnées à domicile.
+ */
+export function getEffectiveUserId(): string | undefined {
+  return useAuthStore.getState().user?.id;
+}
+
 function mapDbUser(data: Record<string, unknown>): User {
   return {
     id: data.id as string,
@@ -173,7 +197,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // ─── Déconnexion ──────────────────────────────────────────
   logout: async () => {
     await supabase.auth.signOut();
-    set({ user: null, isAuthenticated: false, error: null });
+    sessionStorage.removeItem(CLE_IMPERSONATION);
+    set({ user: null, isAuthenticated: false, error: null, isImpersonating: false, realAdmin: null });
   },
 
   // ─── Vérification session au démarrage ────────────────────
@@ -198,7 +223,34 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return;
       }
 
-      set({ user: mapDbUser(userData), isAuthenticated: true, isCheckingSession: false });
+      const vraiUtilisateur = mapDbUser(userData);
+
+      // Restauration de l'impersonation après rechargement de page.
+      // Double garde : la cible n'est reprise que si l'utilisateur RÉEL est
+      // admin — une clé forgée à la main dans sessionStorage ne donne donc
+      // aucun accès. La RLS refuserait de toute façon la lecture.
+      const cibleId = sessionStorage.getItem(CLE_IMPERSONATION);
+      if (cibleId && cibleId !== vraiUtilisateur.id && vraiUtilisateur.role === 'admin') {
+        const { data: cible } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', cibleId)
+          .single();
+
+        if (cible) {
+          set({
+            user: mapDbUser(cible),
+            realAdmin: vraiUtilisateur,
+            isImpersonating: true,
+            isAuthenticated: true,
+            isCheckingSession: false,
+          });
+          return;
+        }
+        sessionStorage.removeItem(CLE_IMPERSONATION);
+      }
+
+      set({ user: vraiUtilisateur, isAuthenticated: true, isCheckingSession: false });
     } catch {
       set({ isCheckingSession: false, isAuthenticated: false });
     }
@@ -262,6 +314,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     if (error || !data) throw new Error('Utilisateur introuvable');
 
+    sessionStorage.setItem(CLE_IMPERSONATION, targetUserId);
     set({
       realAdmin: user,
       user: mapDbUser(data),
@@ -272,6 +325,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   stopImpersonating: () => {
     const { realAdmin } = get();
     if (!realAdmin) return;
+    sessionStorage.removeItem(CLE_IMPERSONATION);
     set({
       user: realAdmin,
       realAdmin: null,
