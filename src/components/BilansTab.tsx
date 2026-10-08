@@ -93,7 +93,7 @@ export default function BilansTab() {
   const { timesheets } = useTimesheetStore();
   const { clients, getContactsForClient } = useClientStore();
   const { mandataires } = useMandataireStore();
-  const { user } = useAuthStore();
+  const { user, isImpersonating } = useAuthStore();
   const { invoices, addInvoice, updateInvoice } = useInvoiceStore();
   const {
     periods, getOrCreatePeriod, getPeriod, getClientStatus,
@@ -338,6 +338,12 @@ export default function BilansTab() {
   // d'ici créerait deux suivis divergents pour un même document.
   const sendCesuEmail = async (row: ClientRow, opts?: { silent?: boolean }): Promise<boolean> => {
     if (!user || !userProfile || isLocked) return false;
+    // Voir InvoicesTab : pendant une usurpation la session est celle de l'admin,
+    // donc l'expediteur resolu cote serveur serait le sien.
+    if (isImpersonating) {
+      if (!opts?.silent) alert("Envoi impossible pendant la consultation d'un autre compte : l'email partirait sous votre identité d'administrateur. Quittez l'usurpation (« Revenir admin ») pour envoyer.");
+      return false;
+    }
     const doc = buildDoc(row);
     if (!doc || !doc.isCESU) return false;
 

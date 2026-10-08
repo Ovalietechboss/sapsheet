@@ -21,6 +21,13 @@ export interface User {
   business_address?: string;
   sap_declaration_number?: string; // n° de déclaration SAP (récépissé préfecture, ex. SAP880186515)
   sap_declaration_date?: string;   // date d'enregistrement de la déclaration (ex. 2020-03-14)
+  // FAC-15 — adresse d'expédition des emails (factures, relevés). Le domaine
+  // doit être vérifié dans Resend, sinon l'envoi est refusé. Vide = repli sur
+  // l'adresse d'envoi commune, mais sous le nom de ce professionnel.
+  // Informatif ici : la valeur qui fait foi est relue côté serveur par
+  // l'Edge Function, qui ne fait jamais confiance au client sur ce point.
+  // `null` est une valeur utile ici : c'est ainsi qu'on EFFACE l'adresse.
+  invoice_from_email?: string | null;
   iban?: string;
   bic?: string;
 }
@@ -92,6 +99,7 @@ function mapDbUser(data: Record<string, unknown>): User {
     business_address: data.business_address as string | undefined,
     sap_declaration_number: data.sap_declaration_number as string | undefined,
     sap_declaration_date: data.sap_declaration_date as string | undefined,
+    invoice_from_email: data.invoice_from_email as string | null | undefined,
     iban: data.iban as string | undefined,
     bic: data.bic as string | undefined,
   };

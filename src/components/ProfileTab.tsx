@@ -41,6 +41,7 @@ export default function ProfileTab() {
       business_address: user.business_address || '',
       sap_declaration_number: user.sap_declaration_number || '',
       sap_declaration_date: user.sap_declaration_date || '',
+      invoice_from_email: user.invoice_from_email || '',
       avatar_url: user.avatar_url || '',
     });
     setIsEditing(true);
@@ -64,7 +65,11 @@ export default function ProfileTab() {
         const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
         avatarUrl = `${pub.publicUrl}?t=${Date.now()}`;
       }
-      await updateUser({ ...formData, avatar_url: avatarUrl });
+      // `invoice_from_email` est contraint en base (adresse plausible OU NULL) :
+      // une chaîne vide ferait échouer TOUT l'enregistrement du profil, pas
+      // seulement ce champ. Vide = pas d'adresse propre, donc NULL.
+      const invoiceFromEmail = String(formData.invoice_from_email || '').trim() || null;
+      await updateUser({ ...formData, invoice_from_email: invoiceFromEmail, avatar_url: avatarUrl });
       setIsEditing(false);
       setAvatarFile(null);
       if (avatarPreview) {
@@ -146,6 +151,7 @@ export default function ProfileTab() {
             <InfoRow label="ADRESSE ENTREPRISE" value={user.business_address} />
             <InfoRow label="N° DÉCLARATION SAP" value={user.sap_declaration_number} />
             <InfoRow label="DATE DÉCLARATION SAP" value={user.sap_declaration_date} />
+            <InfoRow label="EMAIL D'ENVOI DES DOCUMENTS" value={user.invoice_from_email || "adresse commune (vos réponses vous reviennent)"} />
           </div>
         </div>
       </div>
@@ -246,6 +252,20 @@ export default function ProfileTab() {
             <div style={fieldStyle}>
               <label style={labelStyle}>Date déclaration SAP</label>
               <input type="text" value={formData.sap_declaration_date} onChange={(e) => setFormData({ ...formData, sap_declaration_date: e.target.value })} placeholder="14/03/2020" style={inputStyle} />
+            </div>
+            {/* FAC-15 — expéditeur des emails. À laisser VIDE sauf domaine vérifié :
+                Resend refuse d'expédier depuis un domaine qu'il ne connaît pas,
+                et l'envoi échouerait au moment où on en a besoin. */}
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Email d'envoi des documents</label>
+              <input type="email" value={formData.invoice_from_email}
+                onChange={(e) => setFormData({ ...formData, invoice_from_email: e.target.value.trim() })}
+                placeholder="facture@mondomaine.fr" style={inputStyle} />
+              <p style={{ color: '#888', fontSize: '11px', marginTop: '4px', lineHeight: 1.4 }}>
+                À remplir <strong>uniquement</strong> si vous avez un nom de domaine à vous, configuré
+                pour l'envoi. Sinon laissez vide : vos documents partent de l'adresse commune, à votre
+                nom, et les réponses vous reviennent.
+              </p>
             </div>
           </div>
         </div>

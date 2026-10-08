@@ -15,7 +15,7 @@ export default function InvoicesTab() {
   const { timesheets } = useTimesheetStore();
   const { clients, getContactsForClient } = useClientStore();
   const { getMandataireById, hydrateMandataires } = useMandataireStore();
-  const { user } = useAuthStore();
+  const { user, isImpersonating } = useAuthStore();
 
   // Les mandataires ne sont pas hydratés globalement : on les charge ici pour que
   // l'envoi puisse résoudre le destinataire d'un client rattaché à un mandataire.
@@ -245,6 +245,13 @@ export default function InvoicesTab() {
 
   // FAC-07 : envoi de la facture par email (Edge Function send-invoice → Resend).
   const sendInvoiceEmail = async (invoice: any) => {
+    // L'expéditeur est resolu cote serveur depuis la session, qui reste celle de
+    // l'ADMIN pendant une usurpation : l'email partirait sous son identite, avec
+    // sa copie d'archive. On refuse plutot que d'envoyer au nom de quelqu'un.
+    if (isImpersonating) {
+      alert("Envoi impossible pendant la consultation d'un autre compte : l'email partirait sous votre identité d'administrateur. Quittez l'usurpation (« Revenir admin ») pour envoyer.");
+      return;
+    }
     const client = clients.find((c) => c.id === invoice.client_id);
     if (!client) { alert('Client non trouvé'); return; }
     const contacts = getContactsForClient(invoice.client_id);
