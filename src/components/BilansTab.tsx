@@ -110,6 +110,9 @@ export default function BilansTab() {
   const [subView, setSubView] = useState<SubView>('documents');
   const [showNova, setShowNova] = useState(false);
   const [showUrssaf, setShowUrssaf] = useState(false);
+  // Quel chiffre de la modale URSSAF est « ouvert » : mois (index dans le
+  // trimestre), tout le trimestre, ou les factures sans date d'encaissement.
+  const [urssafDetail, setUrssafDetail] = useState<{ month: number | 'all' | 'missing'; cat: 'SAP' | 'SOCIETE' | 'ALL' } | null>(null);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; mode: 'CESU' | 'CLASSICAL' } | null>(null);
   const [confirmBulk, setConfirmBulk] = useState<{ mode: 'CESU' | 'CLASSICAL'; alreadyGen: number; pending: number } | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
@@ -719,23 +722,67 @@ export default function BilansTab() {
     const paidInvoices = invoices.filter((i) => i.status === 'paid');
     const missingDate = paidInvoices.filter((i) => !i.paid_at).length;
 
+    // Chaque chiffre du tableau doit pouvoir être ouvert : on garde la liste des
+    // factures qui le composent, pas seulement la somme. C'est ce qui permet de
+    // justifier un montant déclaré, et de retrouver l'erreur quand il surprend.
+    const toItem = (i: any) => {
+      const c = clients.find((cl) => cl.id === i.client_id);
+      return {
+        id: i.id,
+        number: i.invoice_number,
+        client: c ? [c.titre, c.first_name, c.name].filter(Boolean).join(' ') : '—',
+        isSociete: c?.client_type === 'SOCIETE',
+        paidAt: i.paid_at as number | null,
+        amount: i.total_amount || 0,
+      };
+    };
+
     const months = monthsInQuarter.map((m) => {
       const paid = paidInvoices.filter((i) => {
         if (!i.paid_at) return false; // sans date d'encaissement → non rattaché
         const d = new Date(i.paid_at);
         return d.getFullYear() === selectedYear && d.getMonth() + 1 === m;
       });
-      const autresCA = paid.reduce((s, i) => {
-        const c = clients.find((cl) => cl.id === i.client_id);
-        return c?.client_type === 'SOCIETE' ? s + (i.total_amount || 0) : s;
-      }, 0);
-      const total = paid.reduce((s, i) => s + (i.total_amount || 0), 0);
-      return { label: MONTHS[m - 1], total, sapCA: total - autresCA, autresCA, count: paid.length };
+      const items = paid.map(toItem);
+      const autresCA = items.reduce((s, it) => (it.isSociete ? s + it.amount : s), 0);
+      const total = items.reduce((s, it) => s + it.amount, 0);
+      return { label: MONTHS[m - 1], total, sapCA: total - autresCA, autresCA, count: paid.length, items };
     });
 
     const quarterTotal = months.reduce((s, m) => s + m.total, 0);
-    return { quarterLabel, months, quarterTotal, missingDate };
+    const missingItems = paidInvoices.filter((i) => !i.paid_at).map(toItem);
+    return { quarterLabel, months, quarterTotal, missingDate, missingItems };
   }, [invoices, clients, selectedMonth, selectedYear]);
+
+  // Un clic sur un montant ouvre les factures qui le composent, un second referme.
+  const toggleUrssafDetail = (month: number | 'all' | 'missing', cat: 'SAP' | 'SOCIETE' | 'ALL') =>
+    setUrssafDetail((d) => (d && d.month === month && d.cat === cat ? null : { month, cat }));
+
+  const isUrssafOpen = (month: number | 'all' | 'missing', cat: 'SAP' | 'SOCIETE' | 'ALL') =>
+    !!urssafDetail && urssafDetail.month === month && urssafDetail.cat === cat;
+
+  const urssafDetailRows = useMemo(() => {
+    if (!urssafDetail) return [];
+    if (urssafDetail.month === 'missing') return urssafData.missingItems;
+    const src = urssafDetail.month === 'all'
+      ? urssafData.months.flatMap((m) => m.items)
+      : (urssafData.months[urssafDetail.month as number]?.items || []);
+    if (urssafDetail.cat === 'SAP') return src.filter((i) => !i.isSociete);
+    if (urssafDetail.cat === 'SOCIETE') return src.filter((i) => i.isSociete);
+    return src;
+  }, [urssafDetail, urssafData]);
+
+  const urssafDetailLabel = () => {
+    if (!urssafDetail) return '';
+    if (urssafDetail.month === 'missing') return "Factures payées sans date d'encaissement";
+    const quoi = urssafDetail.cat === 'SAP' ? 'Particuliers (SAP)'
+      : urssafDetail.cat === 'SOCIETE' ? 'Sociétés (B2B)' : 'Toutes catégories';
+    const quand = urssafDetail.month === 'all'
+      ? urssafData.quarterLabel : urssafData.months[urssafDetail.month as number]?.label;
+    return `${quoi} — ${quand}`;
+  };
+
+  const closeUrssaf = () => { setShowUrssaf(false); setUrssafDetail(null); };
 
   const formatDate = (ts: number) => new Date(ts).toLocaleDateString('fr-FR');
   const formatTime = (ts: number) => new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -1349,7 +1396,7 @@ export default function BilansTab() {
 
       {/* ══════ MODAL URSSAF ══════ */}
       {showUrssaf && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }} onClick={() => setShowUrssaf(false)}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }} onClick={() => closeUrssaf()}>
           <div style={{ background: 'white', padding: '32px', borderRadius: '12px', width: '92%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div>
@@ -1375,41 +1422,95 @@ export default function BilansTab() {
               <tbody>
                 <tr style={{ backgroundColor: '#E8F4FF' }}>
                   <td style={{ padding: '10px 12px', fontWeight: '600', fontSize: '13px', borderBottom: '1px solid #eee' }}>Particuliers (SAP)</td>
-                  {urssafData.months.map((m) => (
-                    <td key={m.label} style={{ padding: '10px 12px', textAlign: 'center', fontSize: '15px', fontWeight: 'bold', color: '#1a6fb5', borderBottom: '1px solid #eee' }}>{m.sapCA.toFixed(2)}€</td>
+                  {urssafData.months.map((m, idx) => (
+                    <td key={m.label} onClick={() => toggleUrssafDetail(idx, 'SAP')} title="Voir les factures de ce montant"
+                      style={{ padding: '10px 12px', textAlign: 'center', fontSize: '15px', fontWeight: 'bold', color: '#1a6fb5', borderBottom: '1px solid #eee', cursor: 'pointer', textDecoration: isUrssafOpen(idx, 'SAP') ? 'none' : 'underline dotted', backgroundColor: isUrssafOpen(idx, 'SAP') ? '#cfe6ff' : undefined }}>{m.sapCA.toFixed(2)}€</td>
                   ))}
                 </tr>
                 <tr style={{ backgroundColor: '#F0EBFF' }}>
                   <td style={{ padding: '10px 12px', fontWeight: '600', fontSize: '13px', borderBottom: '1px solid #eee' }}>Sociétés (B2B)</td>
-                  {urssafData.months.map((m) => (
-                    <td key={m.label} style={{ padding: '10px 12px', textAlign: 'center', fontSize: '15px', fontWeight: 'bold', color: '#5b3db5', borderBottom: '1px solid #eee' }}>{m.autresCA.toFixed(2)}€</td>
+                  {urssafData.months.map((m, idx) => (
+                    <td key={m.label} onClick={() => toggleUrssafDetail(idx, 'SOCIETE')} title="Voir les factures de ce montant"
+                      style={{ padding: '10px 12px', textAlign: 'center', fontSize: '15px', fontWeight: 'bold', color: '#5b3db5', borderBottom: '1px solid #eee', cursor: 'pointer', textDecoration: isUrssafOpen(idx, 'SOCIETE') ? 'none' : 'underline dotted', backgroundColor: isUrssafOpen(idx, 'SOCIETE') ? '#e2d8ff' : undefined }}>{m.autresCA.toFixed(2)}€</td>
                   ))}
                 </tr>
                 <tr style={{ backgroundColor: '#EBF9F0', borderTop: '2px solid #00897B' }}>
                   <td style={{ padding: '10px 12px', fontWeight: '600', fontSize: '13px', color: '#00695C' }}>CA payé du mois</td>
-                  {urssafData.months.map((m) => (
-                    <td key={m.label} style={{ padding: '10px 12px', textAlign: 'center', fontSize: '18px', fontWeight: 'bold', color: '#00695C' }}>{m.total.toFixed(2)}€</td>
+                  {urssafData.months.map((m, idx) => (
+                    <td key={m.label} onClick={() => toggleUrssafDetail(idx, 'ALL')} title="Voir les factures de ce montant"
+                      style={{ padding: '10px 12px', textAlign: 'center', fontSize: '18px', fontWeight: 'bold', color: '#00695C', cursor: 'pointer', textDecoration: isUrssafOpen(idx, 'ALL') ? 'none' : 'underline dotted', backgroundColor: isUrssafOpen(idx, 'ALL') ? '#d3f0de' : undefined }}>{m.total.toFixed(2)}€</td>
                   ))}
                 </tr>
               </tbody>
             </table>
 
-            <div style={{ background: '#EBF9F0', border: '1px solid #00897B', borderRadius: '8px', padding: '12px 16px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div onClick={() => toggleUrssafDetail('all', 'ALL')} title="Voir toutes les factures du trimestre"
+              style={{ background: isUrssafOpen('all', 'ALL') ? '#d3f0de' : '#EBF9F0', border: '1px solid #00897B', borderRadius: '8px', padding: '12px 16px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
               <span style={{ fontWeight: 'bold', color: '#00695C', fontSize: '14px' }}>Total CA payé {urssafData.quarterLabel}</span>
               <span style={{ fontWeight: 'bold', color: '#00695C', fontSize: '22px' }}>{urssafData.quarterTotal.toFixed(2)}€</span>
             </div>
 
+            {/* Détail d'un montant : les factures qui le composent. Le total est
+                rappelé en bas, pour qu'on voie que la liste explique bien le chiffre. */}
+            {urssafDetail && (
+              <div style={{ border: '1px solid #ddd', borderRadius: '8px', marginBottom: '20px', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#fafafa', borderBottom: '1px solid #eee' }}>
+                  <strong style={{ fontSize: '13px' }}>{urssafDetailLabel()} · {urssafDetailRows.length} facture(s)</strong>
+                  <button onClick={() => setUrssafDetail(null)}
+                    style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '12px', textDecoration: 'underline' }}>Masquer</button>
+                </div>
+                {urssafDetailRows.length === 0 ? (
+                  <p style={{ margin: 0, padding: '14px', color: '#888', fontSize: '13px' }}>Aucune facture pour ce montant.</p>
+                ) : (
+                  <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                      <thead>
+                        <tr style={{ background: '#f5f5f5' }}>
+                          <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '11px', color: '#888' }}>Encaissée le</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '11px', color: '#888' }}>N°</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '11px', color: '#888' }}>Client</th>
+                          <th style={{ padding: '8px 12px', textAlign: 'right', fontSize: '11px', color: '#888' }}>Montant</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {urssafDetailRows.map((it) => (
+                          <tr key={it.id} style={{ borderTop: '1px solid #f0f0f0' }}>
+                            <td style={{ padding: '8px 12px', color: it.paidAt ? '#333' : '#FF9500' }}>{it.paidAt ? formatDate(it.paidAt) : 'non renseignée'}</td>
+                            <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>{it.number}</td>
+                            <td style={{ padding: '8px 12px' }}>
+                              {it.client}
+                              {it.isSociete && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#5b3db5', fontWeight: 'bold' }}>SOCIÉTÉ</span>}
+                            </td>
+                            <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 'bold', color: it.amount < 0 ? '#FF3B30' : '#333' }}>{it.amount.toFixed(2)}€</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ borderTop: '2px solid #ddd', background: '#fafafa' }}>
+                          <td colSpan={3} style={{ padding: '8px 12px', fontWeight: 'bold' }}>Total</td>
+                          <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 'bold' }}>
+                            {urssafDetailRows.reduce((s, it) => s + it.amount, 0).toFixed(2)}€
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div style={{ background: '#FFF8E7', border: '1px solid #FFCC00', borderRadius: '8px', padding: '10px 14px', marginBottom: '20px', fontSize: '12px', color: '#856400' }}>
               CA rattaché au mois de <strong>paiement</strong> (date d'encaissement). Les CESU en emploi direct (non facturés) ne sont pas comptés ici. Vérifiez avant déclaration.
               {urssafData.missingDate > 0 && (
-                <div style={{ marginTop: '6px', fontWeight: 'bold', color: '#b36b00' }}>
-                  ⚠️ {urssafData.missingDate} facture(s) « payée » sans date d'encaissement → renseignez-la dans l'onglet Factures pour qu'elles soient comptées.
+                <div onClick={() => toggleUrssafDetail('missing', 'ALL')} title="Voir ces factures"
+                  style={{ marginTop: '6px', fontWeight: 'bold', color: '#b36b00', cursor: 'pointer', textDecoration: 'underline' }}>
+                  ⚠️ {urssafData.missingDate} facture(s) « payée » sans date d'encaissement → renseignez-la dans l'onglet Factures pour qu'elles soient comptées. <em>Cliquez pour les voir.</em>
                 </div>
               )}
             </div>
 
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => setShowUrssaf(false)} style={{ flex: 1, padding: '12px', background: '#f5f5f5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+              <button onClick={() => closeUrssaf()} style={{ flex: 1, padding: '12px', background: '#f5f5f5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
                 Fermer
               </button>
               <a href="https://www.autoentrepreneur.urssaf.fr/" target="_blank" rel="noopener noreferrer"
