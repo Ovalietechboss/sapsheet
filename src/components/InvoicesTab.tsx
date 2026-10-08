@@ -28,6 +28,8 @@ export default function InvoicesTab() {
   const [creditForm, setCreditForm] = useState({ amount: '', reason: '', date: '' });
   const [creatingCredit, setCreatingCredit] = useState(false);
   const [onlyUnpaid, setOnlyUnpaid] = useState(false);
+  const [paidModal, setPaidModal] = useState<any | null>(null);
+  const [paidDate, setPaidDate] = useState('');
   const [sendingId, setSendingId] = useState<string | null>(null);
 
   const openCreditModal = (invoice: any) => {
@@ -38,6 +40,31 @@ export default function InvoicesTab() {
       date: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`,
     });
     setCreditModal(invoice);
+  };
+
+  // ── Passage en « payée » : la date d'encaissement est DEMANDÉE ───────────────
+  //
+  // Elle ne peut pas être corrigée après coup depuis la vue « impayés » : une
+  // facture payée n'y figure plus, donc le champ de date de la ligne devient
+  // inatteignable. Et ce n'est pas qu'un confort — c'est le mois de cette date
+  // qui range la recette dans le relevé URSSAF trimestriel. Horodater à
+  // aujourd'hui sans rien demander revenait à déclarer une facture encaissée en
+  // mars sur le trimestre où on la pointe.
+  const openPaidModal = (invoice: any) => {
+    const base = invoice.paid_at ? new Date(invoice.paid_at) : new Date();
+    setPaidDate(`${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`);
+    setPaidModal(invoice);
+  };
+
+  const confirmPaid = async () => {
+    if (!paidModal) return;
+    // Même convention que le champ de date de la ligne (minuit UTC), pour que
+    // la valeur relue s'affiche sur le bon jour.
+    await updateInvoice(paidModal.id, {
+      status: 'paid',
+      paid_at: paidDate ? new Date(paidDate).getTime() : Date.now(),
+    } as any);
+    setPaidModal(null);
   };
 
   const handleCreateCredit = async () => {
@@ -456,11 +483,11 @@ export default function InvoicesTab() {
                       value={invoice.status}
                       onChange={(e) => {
                         const status = e.target.value as 'draft' | 'sent' | 'paid';
-                        // « Payée » → on horodate l'encaissement (base URSSAF). Sinon on l'efface.
-                        const updates: any = { status };
-                        if (status === 'paid') { if (!invoice.paid_at) updates.paid_at = Date.now(); }
-                        else { updates.paid_at = null; }
-                        updateInvoice(invoice.id, updates);
+                        // « Payée » → on demande la date d'encaissement (base URSSAF) avant
+                        // d'écrire quoi que ce soit : depuis la vue « impayés », la facture
+                        // quitte la liste aussitôt et la date ne serait plus saisissable.
+                        if (status === 'paid') { openPaidModal(invoice); return; }
+                        updateInvoice(invoice.id, { status, paid_at: null } as any);
                       }}
                       title="Statut de la facture"
                       style={{ padding: '6px 8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '12px', cursor: 'pointer' }}
@@ -496,6 +523,30 @@ export default function InvoicesTab() {
       </div>
 
       {/* Modal Avoir (note de crédit) */}
+      {paidModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }} onClick={() => setPaidModal(null)}>
+          <div style={{ background: 'white', padding: '28px', borderRadius: '12px', width: '92%', maxWidth: '420px' }} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ margin: '0 0 4px', fontSize: '19px' }}>Encaissement — {paidModal.invoice_number}</h2>
+            <p style={{ margin: '0 0 18px', color: '#888', fontSize: '13px' }}>
+              {Math.abs(paidModal.total_amount || 0).toFixed(2)} €. La date retenue est celle où l'argent
+              est <strong>reçu</strong> : c'est son mois qui range la recette dans le relevé URSSAF.
+            </p>
+
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold', fontSize: '13px' }}>Date d'encaissement</label>
+            <input type="date" value={paidDate} onChange={(e) => setPaidDate(e.target.value)} autoFocus
+              style={{ width: '100%', padding: '10px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box', marginBottom: '20px' }} />
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setPaidModal(null)} style={{ flex: 1, padding: '12px', background: '#f5f5f5', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>Annuler</button>
+              <button onClick={confirmPaid} disabled={!paidDate}
+                style={{ flex: 1, padding: '12px', background: paidDate ? '#34C759' : '#ccc', color: 'white', border: 'none', borderRadius: '8px', cursor: paidDate ? 'pointer' : 'not-allowed', fontWeight: 'bold' }}>
+                Marquer payée
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {creditModal && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }} onClick={() => setCreditModal(null)}>
           <div style={{ background: 'white', padding: '28px', borderRadius: '12px', width: '92%', maxWidth: '460px' }} onClick={(e) => e.stopPropagation()}>
