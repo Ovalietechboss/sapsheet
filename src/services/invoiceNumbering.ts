@@ -12,6 +12,17 @@
  * pas le format annuel `YYYY-NNN` (un tiret) → ils sont ignorés, l'historique
  * existant est préservé sans collision.
  */
+/**
+ * Dernier numero de facture emis sous l'ancien outil (facture.net) avant la bascule.
+ * La serie de l'application demarre juste apres, pour qu'aucun numero ne soit reutilise.
+ * 0 = on demarre a 001. A fixer par le PO avant mise en service.
+ *
+ * Volontairement ici et pas dans un ecran : les factures naissent a DEUX endroits
+ * (onglet Factures pour les societes, onglet Bilans pour les pointages). Deux copies
+ * de ce reglage finiraient par diverger et casser la continuite de la serie.
+ */
+export const INVOICE_NUMBER_START = 0;
+
 export function nextInvoiceNumber(
   invoices: ReadonlyArray<{ invoice_number?: string | null }>,
   year: number,

@@ -19,6 +19,10 @@ export interface Timesheet {
   description?: string;
   notes?: string;
   status: 'draft' | 'validated';
+  /** Facture qui porte ce pointage. NULL/absent = pas encore facture.
+   *  C'est ce champ qui permet plusieurs factures dans un meme mois sans
+   *  jamais recompter deux fois les memes heures. */
+  invoice_id?: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -29,6 +33,10 @@ interface TimesheetStore {
   hydrateTimesheets: () => Promise<void>;
   addTimesheet: (timesheet: Omit<Timesheet, 'id' | 'user_id' | 'status' | 'created_at' | 'updated_at'>) => Promise<void>;
   updateTimesheet: (id: string, updates: Partial<Timesheet>) => Promise<void>;
+  /** Rattache des pointages a une facture (ils cessent d'etre facturables). */
+  imputeTimesheets: (ids: ReadonlyArray<string>, invoiceId: string) => Promise<void>;
+  /** Libere les pointages d'une facture (avoir, ou brouillon supprime). */
+  releaseTimesheets: (invoiceId: string) => Promise<void>;
   deleteTimesheet: (id: string) => Promise<void>;
   getTimesheetsForClient: (clientId: string) => Timesheet[];
   getTimesheetsForMonth: (year: number, month: number) => Timesheet[];
@@ -118,6 +126,47 @@ export const useTimesheetStore = create<TimesheetStore>((set, get) => ({
     set((state) => ({
       timesheets: state.timesheets.map((t) =>
         t.id === id ? { ...t, ...updatedData } : t
+      ),
+    }));
+  },
+
+  // Imputation : ecrit `invoice_id` sur un lot de pointages, en UNE requete.
+  // Appele juste apres la creation de la facture qui les porte. Si cette ecriture
+  // echoue, la facture existe mais les pointages restent libres : ils
+  // ressortiraient dans le « reste a facturer ». On laisse donc l'erreur
+  // remonter pour que l'appelant puisse le signaler, plutot que de la taire.
+  imputeTimesheets: async (ids, invoiceId) => {
+    if (ids.length === 0) return;
+    const now = Date.now();
+
+    const { error } = await supabase
+      .from('timesheets')
+      .update({ invoice_id: invoiceId, updated_at: now })
+      .in('id', ids as string[]);
+
+    if (error) throw error;
+
+    const set_ = new Set(ids);
+    set((state) => ({
+      timesheets: state.timesheets.map((t) =>
+        set_.has(t.id) ? { ...t, invoice_id: invoiceId, updated_at: now } : t
+      ),
+    }));
+  },
+
+  releaseTimesheets: async (invoiceId) => {
+    const now = Date.now();
+
+    const { error } = await supabase
+      .from('timesheets')
+      .update({ invoice_id: null, updated_at: now })
+      .eq('invoice_id', invoiceId);
+
+    if (error) throw error;
+
+    set((state) => ({
+      timesheets: state.timesheets.map((t) =>
+        t.invoice_id === invoiceId ? { ...t, invoice_id: null, updated_at: now } : t
       ),
     }));
   },

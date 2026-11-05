@@ -41,7 +41,8 @@ interface InvoiceStore {
   invoices: Invoice[];
   isLoading: boolean;
   hydrateInvoices: () => Promise<void>;
-  addInvoice: (invoice: Omit<Invoice, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  /** Renvoie la facture creee : son `id` est necessaire pour y imputer les pointages. */
+  addInvoice: (invoice: Omit<Invoice, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<Invoice>;
   updateInvoice: (id: string, updates: Partial<Invoice>) => Promise<void>;
   deleteInvoice: (id: string) => Promise<void>;
   getInvoicesForClient: (clientId: string) => Invoice[];
@@ -89,7 +90,10 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
     const now = Date.now();
     const invoice: Invoice = {
       ...invoiceData,
-      id: `invoice_${now}`,
+      // Un suffixe aleatoire en plus de l'horodatage : depuis qu'un meme client peut
+      // recevoir PLUSIEURS factures dans le mois, deux creations peuvent tomber sur la
+      // meme milliseconde, et `id` est la cle primaire.
+      id: `invoice_${now}_${Math.random().toString(36).slice(2, 8)}`,
       user_id: userId,
       generated_at: invoiceData.generated_at ?? now,
       created_at: now,
@@ -105,6 +109,8 @@ export const useInvoiceStore = create<InvoiceStore>((set, get) => ({
     set((state) => ({
       invoices: [invoice, ...state.invoices],
     }));
+
+    return invoice;
   },
 
   updateInvoice: async (id, updates) => {

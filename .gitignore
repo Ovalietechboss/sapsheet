@@ -49,3 +49,6 @@ yarn-error.log*
 # Misc
 .cache/
 *.tsbuildinfo
+
+# Livrables de session (hors code)
+Claude outputs/

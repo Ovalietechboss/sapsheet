@@ -2,14 +2,15 @@ import React, { useState, useMemo } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
-import { useTimesheetStore } from '../stores/timesheetStore.supabase';
+import { useTimesheetStore, Timesheet } from '../stores/timesheetStore.supabase';
 import { useClientStore, ClientContact } from '../stores/clientStore.supabase';
 import { useMandataireStore, Mandataire } from '../stores/mandataireStore.supabase';
 import { useAuthStore } from '../stores/authStore';
 import { useBillingPeriodStore, BillingPeriod, ClientDocStatus } from '../stores/billingPeriodStore.supabase';
-import { useInvoiceStore, InvoiceLine } from '../stores/invoiceStore.supabase';
+import { useInvoiceStore, Invoice, InvoiceLine } from '../stores/invoiceStore.supabase';
 import { generateCESUTemplate, generateClassicalTemplate, generateRecapTemplate } from '../services/InvoiceTemplates';
-import { nextInvoiceNumber } from '../services/invoiceNumbering';
+import { nextInvoiceNumber, INVOICE_NUMBER_START } from '../services/invoiceNumbering';
+import { editableInvoiceOf, billableTimesheetsOf } from '../services/invoiceBilling';
 import { generateAndSharePDF, generatePdfBase64 } from '../utils/pdfGenerator';
 import { supabase } from '../lib/supabase';
 import { isDureeDirecte } from '../utils/timesheetMode';
@@ -69,6 +70,20 @@ interface ClientRow {
   docChannel: 'email' | 'hand' | null;
   /** Facture correspondante (clients classiques), pour pouvoir la mettre a jour. */
   invoiceId: string | null;
+  /** Factures du mois pour ce client, hors avoirs. Il peut y en avoir PLUSIEURS :
+   *  une facture emise en avance, puis le solde en fin de mois. */
+  monthInvoices: Invoice[];
+  /** La seule facture du mois encore modifiable : brouillon, ni transmise ni payee.
+   *  Une facture envoyee ou payee n'est JAMAIS reecrite — c'est ce qui avait
+   *  detruit la facture d'octobre 2026. */
+  editableInvoice: Invoice | null;
+  /** Deja facture sur le mois (somme des factures ci-dessus). */
+  billedAmount: number;
+  /** Pointages du mois pas encore portes par une facture, + ceux de la facture
+   *  brouillon en cours (qu'une regeneration reprend legitimement). */
+  billableTimesheets: Timesheet[];
+  /** Ce que vaut la prochaine facture. 0 = tout le mois est deja facture. */
+  billableAmount: number;
   facturationMode: 'CESU' | 'CLASSICAL';
   clientType: 'PARTICULIER' | 'SOCIETE';
   clientEmail?: string;
@@ -90,7 +105,7 @@ interface MandataireGroup {
 }
 
 export default function BilansTab() {
-  const { timesheets } = useTimesheetStore();
+  const { timesheets, imputeTimesheets } = useTimesheetStore();
   const { clients, getContactsForClient } = useClientStore();
   const { mandataires } = useMandataireStore();
   const { user, isImpersonating } = useAuthStore();
@@ -157,9 +172,31 @@ export default function BilansTab() {
       //  - CLASSIQUE : l'envoi se fait depuis l'onglet Factures, qui ecrit invoices.sent_at.
       // On lit `sent_at` et jamais `invoices.status` : ce dernier vaut « emise », il peut etre
       // passe a la main sans qu'aucun email ne soit parti.
-      const facture = client.facturation_mode === 'CLASSICAL'
-        ? invoices.find((i) => i.client_id === client.id && i.month === selectedMonth && i.year === selectedYear)
-        : null;
+      // Toutes les factures du mois (avoirs exclus : un avoir annule, il ne facture pas),
+      // les plus recentes d'abord. Il peut y en avoir plusieurs depuis la correction de
+      // l'incident d'octobre 2026 : une facture emise en avance, puis le solde.
+      const monthInvoices = client.facturation_mode === 'CLASSICAL'
+        ? invoices
+            .filter((i) => i.client_id === client.id && i.month === selectedMonth
+                        && i.year === selectedYear && !i.credit_of)
+            .sort((a, b) => b.generated_at - a.generated_at)
+        : [];
+      const facture = monthInvoices[0] ?? null;
+
+      // Regles extraites dans services/invoiceBilling : c'est la qu'elles sont testees,
+      // et c'est la que se trouve le garde-fou de l'incident d'octobre 2026.
+      const editableInvoice = editableInvoiceOf(monthInvoices);
+      const billedAmount = monthInvoices.reduce((s2, i) => s2 + i.total_amount, 0);
+
+      const billableTimesheets = client.facturation_mode === 'CLASSICAL'
+        ? billableTimesheetsOf(cts, editableInvoice)
+        : cts;
+      const billableAmount = billableTimesheets.reduce(
+        (s2, ts) => s2 + Math.round(ts.duration * client.hourly_rate * 100) / 100
+                  + (ts.frais_repas || 0) + (ts.frais_transport || 0) + (ts.frais_autres || 0)
+                  + Math.max(0, ts.ik_amount || 0),
+        0,
+      );
 
       let docState: ClientDocStatus;
       let docSentAt: number | null = null;
@@ -185,6 +222,11 @@ export default function BilansTab() {
         docSentAt,
         docChannel,
         invoiceId: facture?.id ?? null,
+        monthInvoices,
+        editableInvoice,
+        billedAmount,
+        billableTimesheets,
+        billableAmount,
         clientId: client.id,
         clientName: [client.titre, client.first_name, client.name].filter(Boolean).join(' '),
         facturationMode: client.facturation_mode,
@@ -254,18 +296,38 @@ export default function BilansTab() {
     if (!userProfile) return null;
     const client = clients.find((c) => c.id === row.clientId);
     if (!client) return null;
-    const cts = monthTimesheets.filter((ts) => ts.client_id === client.id);
-
     const isCESU = client.facturation_mode === 'CESU';
+
+    // Le relevé CESU couvre le mois entier (c'est un récapitulatif de pointage, pas
+    // une facture). Une FACTURE ne porte que ce qui n'a pas déjà été facturé.
+    const cts = isCESU
+      ? monthTimesheets.filter((ts) => ts.client_id === client.id)
+      : row.billableTimesheets;
+
     const clientTag = client.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_àâäéèêëïîôùûüçÀÂÄÉÈÊËÏÎÔÙÛÜÇ]/g, '');
+
+    // CESU : le numéro reste la clé mois+client, c'est un relevé, il est unique par mois.
+    //
+    // FACTURE : série annuelle continue `AAAA-NNN`, la même que les factures société
+    // (voir services/invoiceNumbering). L'ancien `FAC-AAAA-MM-NOM` n'était pas un
+    // numéro mais une clé mois+client : il rendait impossible une seconde facture
+    // dans le mois, et c'est lui qui a fait écraser la facture d'octobre 2026 déjà
+    // payée. L'historique émis sous l'ancien format est conservé tel quel (décision
+    // PO) : les deux formats cohabitent, `nextInvoiceNumber` ignore l'ancien.
+    //
+    // Une régénération de brouillon REPREND son numéro : on n'en consomme pas un
+    // nouveau à chaque clic.
     const invoiceNumber = isCESU
       ? `CESU-${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${clientTag}`
-      : `FAC-${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${clientTag}`;
+      : (row.editableInvoice?.invoice_number
+         ?? nextInvoiceNumber(invoices, selectedYear, INVOICE_NUMBER_START));
 
     const invoiceData: any = {
       invoice_number: invoiceNumber,
       created_at: Date.now(),
-      total_amount: row.totalAmount,
+      // Le document vaut ce qu'il porte : le mois entier pour un releve CESU,
+      // seulement le reste a facturer pour une facture.
+      total_amount: isCESU ? row.totalAmount : row.billableAmount,
       month: selectedMonth,
       year: selectedYear,
     };
@@ -281,6 +343,24 @@ export default function BilansTab() {
 
   const handleGenerate = async (row: ClientRow) => {
     if (!user || !userProfile || isLocked) return;
+
+    // Rien a facturer : tout le mois est deja porte par des factures emises. Sans ce
+    // garde-fou on produirait une facture a 0 €, ou pire on refacturerait le mois.
+    // Le releve CESU, lui, est un recapitulatif : il se regenere toujours.
+    if (row.facturationMode === 'CLASSICAL' && row.billableTimesheets.length === 0) {
+      alert(
+        row.monthInvoices.length > 0
+          ? `Tout le mois est déjà facturé pour ${row.clientName} `
+            + `(${row.billedAmount.toFixed(2)} € sur ${row.monthInvoices.length} facture`
+            + `${row.monthInvoices.length > 1 ? 's' : ''}).
+
+`
+            + `Pour corriger une facture déjà transmise, passez par un avoir depuis l'onglet Factures.`
+          : `Aucun pointage à facturer pour ${row.clientName} sur ce mois.`
+      );
+      return;
+    }
+
     setGenerating(row.clientId);
     try {
       const period = await getOrCreatePeriod(selectedMonth, selectedYear);
@@ -291,29 +371,60 @@ export default function BilansTab() {
       await generateAndSharePDF(html, `${invoiceNumber}`);
 
       // Lien Bilans → module Factures : suivi de la facture (clients classiques uniquement ;
-      // CESU = pointage, pas une facture). Idempotent + SOFT-FAIL : si l'écriture échoue
+      // CESU = pointage, pas une facture). SOFT-FAIL : si l'écriture échoue
       // (ex. table `invoices` absente), on NE casse PAS la génération Bilans (cœur métier).
       if (!isCESU) {
         try {
-          const existing = invoices.find(
-            (i) => i.client_id === client.id && i.month === selectedMonth && i.year === selectedYear,
-          );
-          if (existing) {
-            await updateInvoice(existing.id, { total_amount: row.totalAmount, invoice_number: invoiceNumber });
+          // On ne met a jour QUE le brouillon du mois : jamais une facture transmise
+          // ou encaissee. C'est cet ecrasement aveugle qui avait detruit, en octobre
+          // 2026, une facture emise en avance et deja payee -- son montant remplace
+          // par celui du mois entier, et ses heures refacturees au client.
+          // Toute autre situation empile une NOUVELLE facture a cote de l'existante.
+          const editable = row.editableInvoice;
+          let invoiceId: string;
+
+          if (editable) {
+            await updateInvoice(editable.id, {
+              total_amount: row.billableAmount,
+              invoice_number: invoiceNumber,
+              generated_at: Date.now(),
+            });
+            invoiceId = editable.id;
           } else {
-            await addInvoice({
+            const created = await addInvoice({
               invoice_number: invoiceNumber,
               client_id: client.id,
               // Generer un PDF n'est pas l'envoyer. La facture nait en brouillon, comme la
               // facture independante societe : elle passe « envoyee » soit par l'envoi email
               // depuis l'onglet Factures, soit a la main via le selecteur de statut.
               status: 'draft',
-              total_amount: row.totalAmount,
+              total_amount: row.billableAmount,
               month: selectedMonth,
               year: selectedYear,
               generated_at: Date.now(),
               facturation_mode: 'CLASSICAL',
             });
+            invoiceId = created.id;
+          }
+
+          // Imputation : ces pointages appartiennent desormais a cette facture et ne
+          // repartiront pas dans la suivante.
+          //
+          // Elle a son propre try : l'echec du SUIVI est benin (la facture papier existe),
+          // mais l'echec de l'IMPUTATION ne l'est pas -- les heures redeviendraient
+          // facturables et seraient facturees une seconde fois, exactement l'incident
+          // d'octobre 2026. On le dit a l'utilisateur au lieu de l'ecrire en console.
+          try {
+            await imputeTimesheets(doc.cts.map((ts) => ts.id), invoiceId);
+          } catch (e) {
+            console.error('[Bilans→Factures] imputation des pointages échouée :', e);
+            alert(
+              `La facture ${invoiceNumber} a été générée, mais les pointages n'ont pas pu y être `
+              + `rattachés (connexion ?).
+
+Ne regénérez pas ce mois avant d'avoir vérifié : `
+              + `ces heures risquent d'être facturées deux fois.`
+            );
           }
         } catch (e) {
           console.warn('[Bilans→Factures] suivi non enregistré (table invoices ?) :', e);
@@ -517,7 +628,7 @@ export default function BilansTab() {
     const invMonth = d.getMonth() + 1;
     const invYear = d.getFullYear();
     const total = Math.round(validLines.reduce((s, l) => s + l.quantity * l.unit_price, 0) * 100) / 100;
-    const invoiceNumber = nextInvoiceNumber(invoices, invYear);
+    const invoiceNumber = nextInvoiceNumber(invoices, invYear, INVOICE_NUMBER_START);
 
     setGenerating(societeModal.clientId);
     try {
@@ -566,6 +677,10 @@ export default function BilansTab() {
     const targets = allClients.filter((r) =>
       r.facturationMode === mode &&
       r.timesheetCount > 0 &&
+      // « Tout regénérer » ne doit pas buter sur les clients dont le mois est
+      // intégralement facturé : handleGenerate les refuserait un par un, avec une
+      // alerte à chaque fois. On les écarte ici, en silence.
+      (mode === 'CESU' || r.billableTimesheets.length > 0) &&
       (force || r.docState === 'pending')
     );
     if (targets.length === 0) return;
@@ -988,13 +1103,42 @@ export default function BilansTab() {
                           }
                           {row.hasDraftTimesheets && row.timesheetCount > 0 && <span style={{ marginLeft: '8px', color: '#FF9500', fontWeight: 'bold' }}>non validés</span>}
                         </div>
+                        {/* Un mois peut porter plusieurs factures (une emise en avance,
+                            puis le solde). On montre donc ce qui est deja facture et ce
+                            qui reste, sinon le bouton « Facture » est aveugle. */}
+                        {!isCESU && row.monthInvoices.length > 0 && (
+                          <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
+                            <span>
+                              {row.monthInvoices.length > 1
+                                ? `${row.monthInvoices.length} factures · `
+                                : ''}
+                              déjà facturé {row.billedAmount.toFixed(2)}€
+                            </span>
+                            {row.billableAmount > 0.005 && (
+                              <span style={{ marginLeft: '8px', color: '#FF9500', fontWeight: 'bold' }}>
+                                reste {row.billableAmount.toFixed(2)}€
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <BadgeDoc etat={row.docState} sentAt={row.docSentAt} canal={row.docChannel} compact={isMobile} />
                         {row.timesheetCount > 0 && !isLocked && (
-                          <button disabled={generating === row.clientId} onClick={() => handleGenerate(row)}
-                            style={{ padding: '7px 14px', backgroundColor: generating === row.clientId ? '#ccc' : color, color: 'white', border: 'none', borderRadius: '6px', cursor: generating === row.clientId ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                            {generating === row.clientId ? '...' : isCESU ? (row.docState === 'pending' ? 'Pointage CESU' : 'Regénérer') : (row.docState === 'pending' ? 'Facture' : 'Regénérer')}
+                          <button disabled={generating === row.clientId || (!isCESU && row.billableTimesheets.length === 0)}
+                            onClick={() => handleGenerate(row)}
+                            title={!isCESU && row.billableTimesheets.length === 0
+                              ? "Tout le mois est déjà facturé. Pour corriger une facture transmise, passez par un avoir (onglet Factures)."
+                              : undefined}
+                            style={{ padding: '7px 14px', backgroundColor: (generating === row.clientId || (!isCESU && row.billableTimesheets.length === 0)) ? '#ccc' : color, color: 'white', border: 'none', borderRadius: '6px', cursor: (generating === row.clientId || (!isCESU && row.billableTimesheets.length === 0)) ? 'not-allowed' : 'pointer', fontSize: '13px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                            {generating === row.clientId ? '...'
+                              : isCESU ? (row.docState === 'pending' ? 'Pointage CESU' : 'Regénérer')
+                              // Le libelle dit ce que le clic va produire : reprendre le
+                              // brouillon, ou emettre une facture de plus sur le mois.
+                              : row.billableTimesheets.length === 0 ? 'Tout facturé'
+                              : row.editableInvoice ? 'Regénérer'
+                              : row.monthInvoices.length > 0 ? 'Facturer le reste'
+                              : 'Facture'}
                           </button>
                         )}
                         {isCESU && row.timesheetCount > 0 && !isLocked && (
@@ -1307,7 +1451,7 @@ export default function BilansTab() {
           <div style={{ background: 'white', padding: '24px 28px', borderRadius: '12px', width: '94%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
             <h2 style={{ margin: 0, fontSize: '19px' }}>Facture indépendante — {societeModal.clientName}</h2>
             <p style={{ margin: '4px 0 18px', color: '#888', fontSize: '13px' }}>
-              Société B2B, hors champ SAP · n° attribué automatiquement ({nextInvoiceNumber(invoices, societeDate ? new Date(societeDate).getFullYear() : selectedYear)})
+              Société B2B, hors champ SAP · n° attribué automatiquement ({nextInvoiceNumber(invoices, societeDate ? new Date(societeDate).getFullYear() : selectedYear, INVOICE_NUMBER_START)})
             </p>
 
             <div style={{ marginBottom: '16px', maxWidth: '220px' }}>

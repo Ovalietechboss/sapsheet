@@ -5,14 +5,14 @@ import { useClientStore } from '../stores/clientStore.supabase';
 import { useMandataireStore } from '../stores/mandataireStore.supabase';
 import { useAuthStore } from '../stores/authStore';
 import { generateCESUTemplate, generateClassicalTemplate } from '../services/InvoiceTemplates';
-import { nextInvoiceNumber, nextCreditNumber } from '../services/invoiceNumbering';
+import { nextInvoiceNumber, nextCreditNumber, INVOICE_NUMBER_START } from '../services/invoiceNumbering';
 import { generateAndSharePDF, generatePdfBase64 } from '../utils/pdfGenerator';
 import { supabase } from '../lib/supabase';
 import InvoiceImportPanel from './InvoiceImportPanel';
 
 export default function InvoicesTab() {
   const { invoices, addInvoice, updateInvoice } = useInvoiceStore();
-  const { timesheets } = useTimesheetStore();
+  const { timesheets, releaseTimesheets } = useTimesheetStore();
   const { clients, getContactsForClient } = useClientStore();
   const { getMandataireById, hydrateMandataires } = useMandataireStore();
   const { user, isImpersonating } = useAuthStore();
@@ -88,6 +88,27 @@ export default function InvoicesTab() {
         generated_at: dateMs,
         facturation_mode: creditModal.facturation_mode || 'CLASSICAL',
       } as any);
+
+      // Un avoir TOTAL annule la facture : ses pointages redeviennent facturables,
+      // pour pouvoir etre repris sur une facture corrigee. Un avoir PARTIEL est une
+      // correction de montant (remise, erreur de taux) : la prestation reste facturee,
+      // on ne libere rien -- sinon elle repartirait en double sur le mois suivant.
+      const avoirTotal = Math.abs(amount) >= Math.abs(creditModal.total_amount) - 0.005;
+      if (avoirTotal) {
+        try {
+          await releaseTimesheets(creditModal.id);
+        } catch (e) {
+          console.error('Liberation des pointages apres avoir echouee :', e);
+          alert(
+            `L'avoir ${number} est créé, mais les pointages de la facture `
+            + `${creditModal.invoice_number} n'ont pas pu être libérés.
+
+`
+            + `Ils resteront absents du « reste à facturer » tant que ce n'est pas corrigé.`
+          );
+        }
+      }
+
       setCreditModal(null);
     } catch (e: any) {
       console.error('Création avoir échouée:', e);
@@ -127,8 +148,6 @@ export default function InvoicesTab() {
     const totalAmount = totalHours * hourlyRate + totalFrais;
 
     // N° de facture — série annuelle continue, gap-safe (cf. services/invoiceNumbering).
-    // INVOICE_NUMBER_START = dernier n° facture.net avant bascule (à fixer par le PO avant mise en service).
-    const INVOICE_NUMBER_START = 0;
     const year = new Date().getFullYear();
     const month = new Date().getMonth() + 1;
     const invoiceNumber = nextInvoiceNumber(invoices, year, INVOICE_NUMBER_START);
