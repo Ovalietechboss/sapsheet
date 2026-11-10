@@ -1,4 +1,4 @@
-import { editableInvoiceOf, billableTimesheetsOf, BillableInvoice } from '../invoiceBilling';
+import { editableInvoiceOf, billableTimesheetsOf, monthDocState, BillableInvoice } from '../invoiceBilling';
 
 const facture = (over: Partial<BillableInvoice> = {}): BillableInvoice => ({
   id: 'inv_1', status: 'draft', sent_at: null, paid_at: null, credit_of: null, ...over,
@@ -91,5 +91,29 @@ describe('Non-regression : le scenario exact d octobre 2026', () => {
     const apres = moisComplet.map((t) =>
       t.invoice_id ? t : { ...t, invoice_id: 'inv_solde' });
     expect(billableTimesheetsOf(apres, editableInvoiceOf([payeeDu6, solde]))).toEqual([]);
+  });
+});
+
+describe('monthDocState — le badge decrit le MOIS, pas un document', () => {
+  const envoyee = facture({ id: 'env', status: 'sent', sent_at: 1_700_000_000_000 });
+  const payee   = facture({ id: 'pay', status: 'paid', sent_at: 1_690_000_000_000, paid_at: 1_691_000_000_000 });
+  const brouillon = facture({ id: 'dft' });
+
+  it('aucune facture : rien n a ete produit', () => {
+    expect(monthDocState([], 3)).toBe('pending');
+  });
+
+  it('NON-REGRESSION novembre 2026 : une facture payee mais du reste a facturer', () => {
+    // C est le cas exact qui affichait « Envoye le 06/10 » sur un mois dont
+    // 266,18 EUR n avaient jamais quitte l application.
+    expect(monthDocState([payee], 3)).toBe('generated');
+  });
+
+  it('une facture brouillon jamais transmise ne rend pas le mois envoye', () => {
+    expect(monthDocState([payee, brouillon], 0)).toBe('generated');
+  });
+
+  it('tout est transmis et plus rien a facturer : le mois est envoye', () => {
+    expect(monthDocState([payee, envoyee], 0)).toBe('sent');
   });
 });

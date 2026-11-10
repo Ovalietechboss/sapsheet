@@ -10,7 +10,8 @@ import { useBillingPeriodStore, BillingPeriod, ClientDocStatus } from '../stores
 import { useInvoiceStore, Invoice, InvoiceLine } from '../stores/invoiceStore.supabase';
 import { generateCESUTemplate, generateClassicalTemplate, generateRecapTemplate } from '../services/InvoiceTemplates';
 import { nextInvoiceNumber, INVOICE_NUMBER_START } from '../services/invoiceNumbering';
-import { editableInvoiceOf, billableTimesheetsOf } from '../services/invoiceBilling';
+import { editableInvoiceOf, billableTimesheetsOf, monthDocState } from '../services/invoiceBilling';
+import { buildInvoiceLines, linesTotal } from '../services/invoiceSnapshot';
 import { generateAndSharePDF, generatePdfBase64 } from '../utils/pdfGenerator';
 import { supabase } from '../lib/supabase';
 import { isDureeDirecte } from '../utils/timesheetMode';
@@ -207,14 +208,17 @@ export default function BilansTab() {
         docState = (persisted?.status as ClientDocStatus) || 'pending';
         docSentAt = persisted?.sent_at ?? null;
         docChannel = persisted?.sent_channel ?? null;
-      } else if (!facture) {
-        docState = 'pending';
-      } else if (facture.sent_at) {
-        docState = 'sent';
-        docSentAt = facture.sent_at;
-        docChannel = facture.sent_channel ?? null;
       } else {
-        docState = 'generated';
+        // Le badge decrit LE MOIS, pas un document (regle testee dans invoiceBilling).
+        docState = monthDocState(monthInvoices, billableTimesheets.length);
+        if (docState === 'sent') {
+          // Tout est transmis : on date le mois par la DERNIERE transmission.
+          const derniere = monthInvoices.reduce(
+            (a, b) => ((b.sent_at ?? 0) > (a.sent_at ?? 0) ? b : a),
+          );
+          docSentAt = derniere.sent_at ?? null;
+          docChannel = derniere.sent_channel ?? null;
+        }
       }
 
       return {
@@ -322,23 +326,32 @@ export default function BilansTab() {
       : (row.editableInvoice?.invoice_number
          ?? nextInvoiceNumber(invoices, selectedYear, INVOICE_NUMBER_START));
 
+    // INSTANTANE : une facture fige son detail a l'emission (voir services/invoiceSnapshot).
+    // Le releve CESU, lui, reste un recapitulatif vivant du mois : il n'a rien a figer.
+    const lignes = isCESU ? null : buildInvoiceLines(cts, client.hourly_rate);
+    const montant = lignes ? linesTotal(lignes) : row.totalAmount;
+
     const invoiceData: any = {
       invoice_number: invoiceNumber,
       created_at: Date.now(),
       // Le document vaut ce qu'il porte : le mois entier pour un releve CESU,
-      // seulement le reste a facturer pour une facture.
-      total_amount: isCESU ? row.totalAmount : row.billableAmount,
+      // la somme de ses lignes figees pour une facture.
+      total_amount: montant,
       month: selectedMonth,
       year: selectedYear,
+      lines: lignes ?? undefined,
     };
 
     const clientContacts = getContactsForClient(client.id);
 
+    // Les lignes sont passees au gabarit : le PDF emis et celui qu'on reimprimera
+    // plus tard depuis l'onglet Factures sont alors rigoureusement identiques.
     const html = isCESU
       ? generateCESUTemplate(invoiceData, client, cts, userProfile, row.mandataire, clientContacts)
-      : generateClassicalTemplate(invoiceData, client, cts, userProfile, row.mandataire, clientContacts);
+      : generateClassicalTemplate(invoiceData, client, cts, userProfile, row.mandataire,
+                                  clientContacts, lignes ?? undefined);
 
-    return { client, cts, isCESU, invoiceNumber, html, clientContacts };
+    return { client, cts, isCESU, invoiceNumber, html, clientContacts, lignes, montant };
   };
 
   const handleGenerate = async (row: ClientRow) => {
@@ -385,7 +398,8 @@ export default function BilansTab() {
 
           if (editable) {
             await updateInvoice(editable.id, {
-              total_amount: row.billableAmount,
+              total_amount: doc.montant,
+              lines: doc.lignes ?? undefined,
               invoice_number: invoiceNumber,
               generated_at: Date.now(),
             });
@@ -398,7 +412,8 @@ export default function BilansTab() {
               // facture independante societe : elle passe « envoyee » soit par l'envoi email
               // depuis l'onglet Factures, soit a la main via le selecteur de statut.
               status: 'draft',
-              total_amount: row.billableAmount,
+              total_amount: doc.montant,
+              lines: doc.lignes ?? undefined,
               month: selectedMonth,
               year: selectedYear,
               generated_at: Date.now(),
@@ -1109,10 +1124,20 @@ Ne regénérez pas ce mois avant d'avoir vérifié : `
                         {!isCESU && row.monthInvoices.length > 0 && (
                           <div style={{ fontSize: '12px', color: '#888', marginTop: '2px' }}>
                             <span>
-                              {row.monthInvoices.length > 1
-                                ? `${row.monthInvoices.length} factures · `
-                                : ''}
-                              déjà facturé {row.billedAmount.toFixed(2)}€
+                              {(() => {
+                                // On enonce l'etat REEL du mois, facture par facture :
+                                // « 1 payée · 1 à envoyer ». Un compte global ne disait pas
+                                // ce qui restait a faire.
+                                const payees  = row.monthInvoices.filter((i) => i.status === 'paid').length;
+                                const envoyees = row.monthInvoices.filter((i) => i.sent_at && i.status !== 'paid').length;
+                                const aEnvoyer = row.monthInvoices.filter((i) => !i.sent_at).length;
+                                const parts = [
+                                  payees    ? `${payees} payée${payees > 1 ? 's' : ''}` : null,
+                                  envoyees  ? `${envoyees} envoyée${envoyees > 1 ? 's' : ''}` : null,
+                                  aEnvoyer  ? `${aEnvoyer} à envoyer` : null,
+                                ].filter(Boolean);
+                                return `${parts.join(' · ')} — ${row.billedAmount.toFixed(2)}€ facturés`;
+                              })()}
                             </span>
                             {row.billableAmount > 0.005 && (
                               <span style={{ marginLeft: '8px', color: '#FF9500', fontWeight: 'bold' }}>

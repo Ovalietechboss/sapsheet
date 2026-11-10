@@ -62,3 +62,24 @@ export function billableTimesheetsOf<T extends BillableTimesheet>(
     (ts) => !ts.invoice_id || (editableInvoice !== null && ts.invoice_id === editableInvoice.id),
   );
 }
+
+/**
+ * Etat d'un MOIS, et non d'un document.
+ *
+ * Depuis qu'un mois peut porter plusieurs factures, afficher l'etat de la plus
+ * recente est un mensonge : un mois dont la facture d'avance etait partie mais
+ * dont le solde n'existait pas s'annoncait « Envoye ». C'est ce qui a fait perdre
+ * le fil en novembre 2026.
+ *
+ * Regle : le mois n'est « envoye » que lorsque plus rien n'attend -- aucune heure
+ * a facturer, et aucune facture qui n'ait ete transmise.
+ */
+export function monthDocState(
+  monthInvoices: ReadonlyArray<BillableInvoice & { sent_at?: number | null }>,
+  nbTimesheetsAFacturer: number,
+): 'pending' | 'generated' | 'sent' {
+  if (monthInvoices.length === 0) return 'pending';
+  if (nbTimesheetsAFacturer > 0) return 'generated';
+  if (monthInvoices.some((i) => !i.sent_at)) return 'generated';
+  return 'sent';
+}

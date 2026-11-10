@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useTimesheetStore, Timesheet } from '../stores/timesheetStore.supabase';
 import { useClientStore } from '../stores/clientStore.supabase';
+import { useInvoiceStore } from '../stores/invoiceStore.supabase';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { isDureeDirecte } from '../utils/timesheetMode';
 import ClientCombobox from './ClientCombobox';
@@ -17,7 +18,33 @@ const labelStyle: React.CSSProperties = { display: 'block', marginBottom: '6px',
 export default function TimesheetsTab() {
   const { timesheets, addTimesheet, updateTimesheet, deleteTimesheet } = useTimesheetStore();
   const { clients } = useClientStore();
+  const { invoices } = useInvoiceStore();
   const isMobile = useIsMobile();
+
+  // Un pointage porte par une facture EMISE (transmise ou encaissee) ne se retouche
+  // plus. Le 09/11/2026, la correction d'indemnites kilometriques sur un pointage
+  // deja facture ET PAYE le 14/10 a change le contenu d'une piece comptable, en
+  // silence, et rendu le mois illisible. Une facture emise se corrige par un avoir.
+  // Un pointage encore sur un simple brouillon reste librement modifiable.
+  const factureFigeant = (ts: Timesheet) => {
+    if (!ts.invoice_id) return null;
+    const f = invoices.find((i) => i.id === ts.invoice_id);
+    if (!f) return null;
+    if (f.status === 'paid') return { f, motif: `payée le ${f.paid_at ? new Date(f.paid_at).toLocaleDateString('fr-FR') : '?'}` };
+    if (f.sent_at)           return { f, motif: `transmise le ${new Date(f.sent_at).toLocaleDateString('fr-FR')}` };
+    return null;
+  };
+
+  const refuserSiFige = (ts: Timesheet, verbe: string) => {
+    const fige = factureFigeant(ts);
+    if (!fige) return false;
+    alert(
+      `Ce pointage est porté par la facture ${fige.f.invoice_number}, ${fige.motif}.\n\n`
+      + `Impossible de le ${verbe} : cela modifierait une facture déjà émise.\n\n`
+      + `Pour la corriger, passez par un avoir depuis l'onglet Factures.`
+    );
+    return true;
+  };
 
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
@@ -85,6 +112,7 @@ export default function TimesheetsTab() {
   const openCreate = () => { setFormData(emptyForm()); setEditingId(null); setShowOptions(false); setModalMode('create'); };
 
   const openEdit = (ts: Timesheet) => {
+    if (refuserSiFige(ts, 'modifier')) return;
     const arrival = new Date(ts.date_arrival);
     const departure = new Date(ts.date_departure);
     const ds = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -241,7 +269,7 @@ export default function TimesheetsTab() {
                             {isMobile ? '✓' : 'Valider'}
                           </button>
                         ) : (
-                          <button onClick={() => updateTimesheet(ts.id, { status: 'draft' })}
+                          <button onClick={() => { if (refuserSiFige(ts, 'repasser en brouillon')) return; updateTimesheet(ts.id, { status: 'draft' }); }}
                             style={{ padding: isMobile ? '5px 8px' : '6px 12px', backgroundColor: '#FF9500', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>
                             {isMobile ? '↩' : 'Brouillon'}
                           </button>
@@ -252,7 +280,7 @@ export default function TimesheetsTab() {
                             Modifier
                           </button>
                         )}
-                        <button onClick={() => { if (window.confirm('Supprimer ce pointage ?')) deleteTimesheet(ts.id); }}
+                        <button onClick={() => { if (refuserSiFige(ts, 'supprimer')) return; if (window.confirm('Supprimer ce pointage ?')) deleteTimesheet(ts.id); }}
                           style={{ padding: isMobile ? '5px 8px' : '6px 12px', backgroundColor: '#ff3b30', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}>
                           {isMobile ? '✕' : 'Supprimer'}
                         </button>

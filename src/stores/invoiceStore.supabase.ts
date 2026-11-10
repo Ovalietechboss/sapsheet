@@ -2,11 +2,17 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { useAuthStore, getEffectiveUserId } from './authStore';
 
-/** Ligne d'une facture indépendante (société B2B, sans pointage). */
+/** Ligne de facture. Deux usages :
+ *  - facture independante (societe B2B) : lignes saisies a la main ;
+ *  - facture issue des pointages : INSTANTANE pris a l'emission, pour que le
+ *    document ne change plus si un pointage est modifie apres coup.
+ */
 export interface InvoiceLine {
   designation: string;
   quantity: number;
   unit_price: number; // prix unitaire HT
+  /** Sous-ligne grise : les dates et durees couvertes. Texte brut, echappe au rendu. */
+  detail?: string;
 }
 
 export interface Invoice {

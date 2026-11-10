@@ -4,6 +4,11 @@ import { Timesheet } from '../stores/timesheetStore.supabase';
 import { Mandataire } from '../stores/mandataireStore.supabase';
 import { isDureeDirecte } from '../utils/timesheetMode';
 
+/** Echappe un texte destine au HTML du document. */
+const escapeHtml = (v: string): string =>
+  v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+   .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
 interface User {
   displayName: string;
   email: string;
@@ -304,10 +309,15 @@ export const generateClassicalTemplate = (
   const indepDetailHTML = isIndependent
     ? lines!.map((l) => {
         const lineTotal = Math.round(l.quantity * l.unit_price * 100) / 100;
+        // `detail` vient d'un instantane stocke en base : on l'echappe, il n'a
+        // aucune raison de porter du HTML.
+        const detailHtml = l.detail
+          ? `<br/><span style="font-size:11px;color:#555;">${escapeHtml(l.detail).replace(/\n/g, '<br/>')}</span>`
+          : '';
         return `
       <tr>
         <td style="${td}">Prestation</td>
-        <td style="${td}"><strong>${l.designation}</strong></td>
+        <td style="${td}"><strong>${l.designation}</strong>${detailHtml}</td>
         <td style="${td} text-align: right;">${l.unit_price.toFixed(2)} €</td>
         <td style="${td} text-align: center;">${l.quantity % 1 === 0 ? l.quantity.toFixed(0) : l.quantity}</td>
         <td style="${td} text-align: right; font-weight: bold;">${lineTotal.toFixed(2)} €</td>
