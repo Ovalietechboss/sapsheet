@@ -30,20 +30,49 @@ COMMENT ON COLUMN timesheets.invoice_id IS
   'libere par un avoir ou par la suppression d''une facture brouillon.';
 
 -- ---------------------------------------------------------------------------
--- REPRISE DE L''EXISTANT — a lancer UNE SEULE FOIS, apres avoir lu le constat.
+-- REPRISE DE L''EXISTANT — APPLIQUEE EN PROD LE 2026-11-11.
 --
--- Laisser tous les pointages passes a NULL ferait reapparaitre des mois deja
--- regles dans le « reste a facturer ». On rattache donc chaque pointage deja
--- facture a la facture de son mois. Volontairement commente : a derouler
--- seulement quand le cas d''octobre 2026 est tranche (sinon il imputerait a la
--- facture ecrasee des heures qui doivent partir sur une seconde facture).
+-- Pourquoi elle n'est plus commentee : livree desactivee le 05/11, elle n'a jamais
+-- ete lancee. Pendant six jours, les 44 mois-clients deja factures de 2026 se sont
+-- affiches « X EUR factures · reste X EUR » dans Bilans, et le bouton y proposait
+-- d'emettre une SECONDE facture pour des heures deja reglees. Une reprise de
+-- donnees ne se livre pas commentee : soit elle tourne, soit le deploiement attend.
+--
+-- Trois garde-fous, sans lesquels elle est dangereuse :
+--   1. `NOT EXISTS` — on ne touche pas une facture qui porte deja ses pointages ;
+--   2. count(...) = 1 — on refuse les mois a PLUSIEURS factures, ou le rattachement
+--      serait arbitraire (cas reel : octobre 2026 d'un client, facture d'acompte
+--      payee + facture de solde) ; ces mois se traitent un par un ;
+--   3. clients CLASSICAL seulement — le CESU ne passe pas par `invoices`.
+--
+-- Verifie AVANT execution sur les donnees reelles : 42 mois au centime pres, et
+-- 2 ecarts expliques par une hausse de tarif horaire (23 -> 25 EUR/h) posterieure
+-- aux factures d'avril. ⚠️ Un controle qui recalcule un montant historique avec le
+-- tarif ACTUEL du client produit de faux ecarts — comparer au taux implicite de la
+-- facture (montant - frais) / heures.
+--
+-- Resultat : 115 pointages rattaches a 44 factures. Idempotent, rejouable.
+-- Controles permanents : `supabase-controle-integrite.sql`.
 -- ---------------------------------------------------------------------------
--- UPDATE timesheets t
--- SET    invoice_id = i.id
--- FROM   invoices i
--- WHERE  t.invoice_id IS NULL
---   AND  i.client_id = t.client_id
---   AND  i.facturation_mode = 'CLASSICAL'
---   AND  i.credit_of IS NULL
---   AND  i.year  = extract(year  FROM to_timestamp(t.date_arrival / 1000) AT TIME ZONE 'Europe/Paris')::int
---   AND  i.month = extract(month FROM to_timestamp(t.date_arrival / 1000) AT TIME ZONE 'Europe/Paris')::int;
+WITH cible AS (
+  SELECT i.id AS invoice_id, i.client_id,
+         i.year || '-' || lpad(i.month::text, 2, '0') AS mois
+  FROM invoices i
+  JOIN clients c ON c.id = i.client_id
+  WHERE c.facturation_mode = 'CLASSICAL'
+    AND i.credit_of IS NULL
+    AND NOT EXISTS (SELECT 1 FROM timesheets x WHERE x.invoice_id = i.id)
+    AND (SELECT count(*) FROM invoices i2
+          WHERE i2.client_id = i.client_id AND i2.year = i.year
+            AND i2.month = i.month AND i2.credit_of IS NULL) = 1
+), maj AS (
+  UPDATE timesheets t
+  SET invoice_id = cible.invoice_id,
+      updated_at = (extract(epoch from now()) * 1000)::bigint
+  FROM cible
+  WHERE t.client_id = cible.client_id
+    AND t.invoice_id IS NULL
+    AND to_char(to_timestamp(t.date_arrival / 1000) AT TIME ZONE 'Europe/Paris', 'YYYY-MM') = cible.mois
+  RETURNING t.id, t.invoice_id
+)
+SELECT count(*) AS pointages_rattaches, count(DISTINCT invoice_id) AS factures_concernees FROM maj;
