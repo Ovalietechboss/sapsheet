@@ -11,6 +11,14 @@
  * Les anciens numéros au format mensuel `YYYY-MM-NNN` (deux tirets) ne matchent
  * pas le format annuel `YYYY-NNN` (un tiret) → ils sont ignorés, l'historique
  * existant est préservé sans collision.
+ *
+ * ⚠ Les factures de REPRISE portent `YYYY-NNN (ancien numéro)` : `invoiceImport.ts`
+ * leur attribue la série conforme et garde l'ancienne référence entre parenthèses.
+ * Ce sont de VRAIS numéros du registre. Le motif ancré sur la fin les ignorait, donc
+ * la série repartait à 001 et entrait en collision (incident 2026-11-11 : `2026-002`
+ * émise alors que `2026-002 (FAC-2026-03-PLET)` existait déjà). Le motif accepte
+ * désormais un suffixe séparé par une espace, sans jamais matcher `YYYY-MM-NNN`
+ * (où les chiffres sont suivis d'un tiret).
  */
 /**
  * Dernier numero de facture emis sous l'ancien outil (facture.net) avant la bascule.
@@ -28,7 +36,7 @@ export function nextInvoiceNumber(
   year: number,
   startOffset = 0,
 ): string {
-  const re = new RegExp(`^${year}-(\\d+)$`);
+  const re = new RegExp(`^${year}-(\\d+)(?:\\s|$)`);
   let max = startOffset;
   for (const inv of invoices) {
     const m = inv.invoice_number?.match(re);
